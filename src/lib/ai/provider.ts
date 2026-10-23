@@ -1,4 +1,4 @@
-import { prettifyError, type z } from "zod";
+import { prettifyError, toJSONSchema, type z } from "zod";
 
 import type { AiProvider as AiProviderKind, Creativity } from "@/generated/prisma/enums";
 
@@ -230,4 +230,9 @@ export function validateJson<T>(text: string, schema: z.ZodType<T>): { ok: true;
   const result = schema.safeParse(value);
   if (result.success) return { ok: true, data: result.data };
   return { ok: false, problem: prettifyError(result.error).slice(0, MAX_PROBLEM_LENGTH) };
+}
+
+/** `system` with the schema spelled out, for when the server won't enforce it. */
+export function withSchemaInstructions(system: string, schema: z.ZodType): string {
+  return `${system}\n\nReply with only a JSON object, no other text, that matches this JSON schema:\n${JSON.stringify(toJSONSchema(schema))}`;
 }

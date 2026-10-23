@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
 import { AiError } from "../errors";
-import { BaseProvider, type ChatAnswer, type ChatCall, type Effort } from "../provider";
+import { BaseProvider, type ChatAnswer, type ChatCall, type Effort, withSchemaInstructions } from "../provider";
 import { keyGuardedFetch } from "./guarded-fetch";
 
 /** Offered when the model list can't be fetched, e.g. before a key is saved. */
@@ -20,6 +20,10 @@ const THINKING_TOKENS = 12_000;
 // The effort levels each server and model takes, looked up once: older
 // models, such as Claude Haiku 4.5, refuse the parameter.
 const effortLevels = new Map<string, ReadonlySet<Effort>>();
+
+// Schemas the API refuses to compile ("The compiled grammar is too large"),
+// by server, model and schema name: those go into the instructions instead.
+const promptedSchemas = new Set<string>();
 
 /** Claude through the Messages API with the user's own key. */
 export class AnthropicProvider extends BaseProvider {
@@ -44,12 +48,25 @@ export class AnthropicProvider extends BaseProvider {
   protected async chat(call: ChatCall): Promise<ChatAnswer> {
     if (!this.client) throw AiError.config("Add your Anthropic API key in Settings → AI provider first.");
     const effort = call.effort && (await this.effortLevels(this.client, call.model, call.signal)).has(call.effort) ? call.effort : undefined;
-    const outputConfig = { ...(call.json ? { format: zodOutputFormat(call.json.schema) } : {}), ...(effort ? { effort } : {}) };
-    const message = await this.client.messages.create(
+    const key = `${this.baseURL} ${call.model} ${call.json?.name}`;
+    if (!call.json || promptedSchemas.has(key)) return this.send(this.client, call, effort, false);
+    try {
+      return await this.send(this.client, call, effort, true);
+    } catch (error) {
+      if (!(error instanceof Anthropic.BadRequestError && /grammar/i.test(error.message))) throw error;
+      promptedSchemas.add(key);
+      return this.send(this.client, call, effort, false);
+    }
+  }
+
+  /** One call; `enforceSchema` asks the API to hold the answer to the schema, otherwise the instructions carry it. */
+  private async send(client: Anthropic, call: ChatCall, effort: Effort | undefined, enforceSchema: boolean): Promise<ChatAnswer> {
+    const outputConfig = { ...(call.json && enforceSchema ? { format: zodOutputFormat(call.json.schema) } : {}), ...(effort ? { effort } : {}) };
+    const message = await client.messages.create(
       {
         model: call.model,
         max_tokens: call.maxTokens + THINKING_TOKENS,
-        system: call.system,
+        system: call.json && !enforceSchema ? withSchemaInstructions(call.system, call.json.schema) : call.system,
         messages: call.messages,
         ...(Object.keys(outputConfig).length > 0 ? { output_config: outputConfig } : {}),
       },

@@ -192,6 +192,24 @@ describe("AnthropicProvider", () => {
     expect(requests[0].body).toMatchObject({ output_config: { format: { type: "json_schema" } } });
   });
 
+  it("puts a schema too large to compile into the instructions instead, and remembers that", async () => {
+    const baseUrl = `https://claude-${Math.random()}.example`;
+    const requests = stubFetch(({ body }) =>
+      (body as { output_config?: unknown }).output_config
+        ? json({ type: "error", error: { type: "invalid_request_error", message: "The compiled grammar is too large, which would cause performance issues." } }, { status: 400 })
+        : anthropicMessage('```json\n{"name":"Jane","years":9}\n```'),
+    );
+    const provider = new AnthropicProvider(baseUrl, "sk-ant", "claude-sonnet-5", 60_000);
+    expect(await provider.complete({ ...ask, schema: Person })).toEqual({ name: "Jane", years: 9 });
+    expect(await provider.complete({ ...ask, schema: Person })).toEqual({ name: "Jane", years: 9 });
+    expect(requests).toHaveLength(3);
+    expect(requests[0].body).toMatchObject({ output_config: { format: { type: "json_schema" } } });
+    for (const request of requests.slice(1)) {
+      expect(request.body).not.toHaveProperty("output_config");
+      expect((request.body as { system: string }).system).toMatch(/^Be brief\.\n\nReply with only a JSON object[\s\S]*"years"/);
+    }
+  });
+
   it("says when the model declines", async () => {
     stubFetch(() => anthropicMessage("", "refusal"));
     const provider = new AnthropicProvider("https://api.anthropic.com", "sk-ant", "claude-sonnet-5", 60_000);
