@@ -39,6 +39,10 @@ async function logged<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 
+// Several titles separated by commas are each searched, and their pages go
+// on together: `next` then holds every title's own, null once it's done.
+const EACH = "each:";
+
 /** One page of postings for `query` from `source`, from the cache when it was asked for in the last half hour. */
 export async function searchPostings<S extends JobSource>(
   source: S,
@@ -48,6 +52,30 @@ export async function searchPostings<S extends JobSource>(
   context: RequestContext = {},
 ): Promise<SearchPage> {
   if (!sourceCovers(source, query.country)) throw jobSearchError("country", source, { country: query.country });
+  const titles = query.keywords.split(",").map((title) => title.trim()).filter(Boolean);
+  // A search kept from before titles were split goes on as it began.
+  if (titles.length > 1 && (next === null || next.startsWith(EACH))) {
+    const cursors: (string | null)[] | null = next ? JSON.parse(next.slice(EACH.length)) : null;
+    const pages = await Promise.all(
+      titles.map((title, index) =>
+        cursors && !cursors[index] ? { postings: [], next: null } : searchPostings(source, credentials, { ...query, keywords: title }, cursors?.[index] ?? null, context),
+      ),
+    );
+    // Taking turns, so the first title doesn't fill the page; a posting two titles found is shown once.
+    const seen = new Set<string>();
+    const postings: FoundPosting[] = [];
+    for (let rank = 0; rank < Math.max(...pages.map((page) => page.postings.length)); rank++) {
+      for (const page of pages) {
+        const posting = page.postings[rank];
+        if (posting && !seen.has(postingKey(posting))) {
+          seen.add(postingKey(posting));
+          postings.push(posting);
+        }
+      }
+    }
+    const nexts = pages.map((page) => page.next);
+    return { postings, next: nexts.some(Boolean) ? EACH + JSON.stringify(nexts) : null };
+  }
   const adapter = adapterFor(source);
   const key = `search:${source}:${JSON.stringify(query)}:${next ?? ""}`;
   const hit = cached<SearchPage>(key);

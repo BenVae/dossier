@@ -33,6 +33,27 @@ describe("searchPostings", () => {
     expect(requests).toHaveLength(3);
   });
 
+  it("searches titles separated by commas one by one, takes turns between them, and pages each on its own", async () => {
+    const offer = (ref: string) => ({ stellenangebotsTitel: ref, referenznummer: ref, firma: "Acme", stellenlokationen: [] });
+    const answers: Record<string, unknown> = {
+      "designer 1": { ergebnisliste: [offer("A"), offer("B")], maxErgebnisse: 60 },
+      "developer 1": { ergebnisliste: [offer("C"), offer("B")], maxErgebnisse: 2 },
+      "designer 2": { ergebnisliste: [offer("D")], maxErgebnisse: 60 },
+      "designer, developer 2": { ergebnisliste: [offer("E")], maxErgebnisse: 60 },
+    };
+    const requests = stubFetch(({ url }) => json(answers[`${url.searchParams.get("was")} ${url.searchParams.get("page")}`]));
+    const both = { ...query, keywords: " designer, developer ," };
+
+    const first = await searchPostings("ARBEITSAGENTUR", {}, both);
+    expect(first.postings.map((posting) => posting.title)).toEqual(["A", "C", "B"]);
+    const second = await searchPostings("ARBEITSAGENTUR", {}, both, first.next);
+    expect(second).toMatchObject({ postings: [{ title: "D" }], next: expect.stringMatching(/^each:/) });
+    expect(requests).toHaveLength(3);
+
+    // A search kept from before titles were split goes on as it began.
+    expect((await searchPostings("ARBEITSAGENTUR", {}, { ...query, keywords: "designer, developer" }, "page:2")).postings).toMatchObject([{ title: "E" }]);
+  });
+
   it("doesn't keep failures", async () => {
     let status = 503;
     const requests = stubFetch(() => json(jsearchV2LastPage, { status }));
