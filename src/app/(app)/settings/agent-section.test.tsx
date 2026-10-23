@@ -45,7 +45,7 @@ describe("Settings → Job agent (E16-7)", () => {
     open({ initial: { ...initial, query: { ...initial.query, keywords: "", country: "" } } });
     await user.click(screen.getByRole("switch", { name: "Run the job agent" }));
     expect(saveAgentSettings).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("What")).toHaveAccessibleDescription("Type what the agent should look for.");
+    expect(screen.getByLabelText("What")).toHaveAccessibleDescription("Separate several titles with commas. Type what the agent should look for.");
     expect(screen.getByLabelText("Country")).toHaveAccessibleDescription("Choose a country.");
     expect(screen.getByRole("switch", { name: "Run the job agent" })).toHaveAttribute("aria-checked", "false");
   });

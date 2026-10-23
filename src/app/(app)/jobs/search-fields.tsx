@@ -44,6 +44,7 @@ export function SearchFields({
         className="sm:col-span-2 lg:col-span-1"
         value={value.keywords}
         placeholder="Job title, skill or company"
+        hint="Separate several titles with commas."
         error={errors.keywords}
         onChange={(event) => onChange({ keywords: event.target.value })}
         onBlur={onBlur}
