@@ -162,3 +162,27 @@ export const arbeitsagenturDetails = {
   stellenangebotsBeschreibung: "**Wer wir sind**\r\nHafenlogik baut Software für den Hafen.\r\n\r\n\r\n**Was du machst**\n- APIs bauen\n- Tests schreiben",
   referenznummer: "10001-1003486534-S",
 };
+
+const rwthRow = (link: string, published: string, unit: string) => `<tr>
+<td style="--col-width: 45.4%; --text-align: left;">
+<h3 class="h5 mobile-caption sortable">
+<a href="/cms/root/wir/Karriere/~buym/RWTH-Jobportal/lidx/1/?sortby=STELLENBEZ&amp;asc=1#search-results" class="no-decorations">Job Description</a>
+</h3>${link}<br />[published ${published}]</td>
+<td style="--col-width: 36.2%; --text-align: left;">
+<h3 class="h5 mobile-caption sortable">
+<a href="/cms/root/wir/Karriere/~buym/RWTH-Jobportal/lidx/1/?sortby=ANTRAGSTELLER&amp;asc=1#search-results" class="no-decorations">RWTH Institution/Unit [IKZ]</a>
+</h3>${unit}</td>
+</tr>`;
+
+/** The RWTH job portal's English listings, as they read on 25 October 2026, cut to three rows. */
+export const rwthPage = `<!DOCTYPE html><html lang="en"><body><main>
+<div class="result-wrapper">
+<h2 class="h3 result-count skip-to-module" id="search-results">Showing 1 - 50 of 184 Results</h2>
+<div class="paging-wrapper"><div class="last-next-wrapper"><a class="no-decorations pager next" href="/cms/root/wir/Karriere/~buym/RWTH-Jobportal/lidx/1/?page=2#search-results">Next Page</a><a class="no-decorations pager last" href="/cms/root/wir/Karriere/~buym/RWTH-Jobportal/lidx/1/?page=4#search-results">Last Page</a></div></div><table class="results">
+<tbody>
+${rwthRow('<a href="/go/id/kbag/file/V000011619/lidx/1/" target="_self" class="iconless">Research Assistant (f/m/d) - Experimental Hybrid Additive Manufacturing and Microstructure Characterization [V000011619]</a>', "19/10/2026", "Chair for Digital Additive Production [421510]")}
+${rwthRow('<a href="/go/id/kbag/file/V000011488/" target="_self" class="iconless">Sachgebietsleiter*in für das Sachgebiet 10.34 Abwasser-, Wasser- und Gasanlagen (w/m/d) (in German only) [V000011488]</a>', "19/10/2026", "Division 10.3 - Technical Facilities Management - Mechanical Systems [011030]")}
+${rwthRow('<a href="/go/id/kbag/file/V000011524/" target="_self" class="iconless">Softwareentwickler*in (w/m/d) für die landesweite KI-Plattform der NRW-Hochschulen &#8211; Projekt KI:Expertisezentrum.nrw (in German only) [V000011524]</a>', "05/10/2026", "IT Center [022000]")}
+</tbody>
+</table>
+</div></main></body></html>`;

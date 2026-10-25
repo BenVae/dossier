@@ -35,13 +35,14 @@ beforeEach(() => {
 });
 
 describe("JobSearchSection", () => {
-  it("offers the three sources and Off, as a radio group, Off by default", () => {
+  it("offers the four sources and Off, as a radio group, Off by default", () => {
     render(<JobSearchSection initial={off} />);
     expect(screen.getByRole("heading", { name: "Job search" })).toBeInTheDocument();
     expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual([
       "JSearch",
       "Adzuna",
       "Bundesagentur für Arbeit",
+      "RWTH Aachen University",
       "Off",
     ]);
     expect(screen.getByRole("radio", { name: "Off" })).toBeChecked();
@@ -126,7 +127,7 @@ describe("JobSearchSection", () => {
 
   it("leaves the Arbeitsagentur out when the server doesn't offer it", () => {
     render(<JobSearchSection initial={withSource({ arbeitsagentur: { offered: false, acceptedAt: null } })} />);
-    expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(["JSearch", "Adzuna", "Off"]);
+    expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(["JSearch", "Adzuna", "RWTH Aachen University", "Off"]);
   });
 
   it("shows keys from the environment and keys that can't be read", () => {

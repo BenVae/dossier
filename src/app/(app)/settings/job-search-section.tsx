@@ -171,6 +171,12 @@ export function JobSearchSection({ initial }: { initial: JobSearchSettingsView }
                 <p className="text-sm text-muted">No key needed. The job agent doesn&apos;t search this source; choose JSearch or Adzuna for it.</p>
               </>
             )}
+            {source === "RWTH" && (
+              <p className="text-sm text-muted">
+                No key needed. Dossier reads the listings on RWTH Aachen University&apos;s job portal, which only has jobs at the university. It
+                isn&apos;t an API, so it can change without notice.
+              </p>
+            )}
 
             {testable && (
               <div className="flex flex-wrap items-center gap-3.5 pt-1">

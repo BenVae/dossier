@@ -54,7 +54,9 @@ export function jobSearchError(problem: JobSearchProblem, source: JobSource, { c
     changed:
       source === "ARBEITSAGENTUR"
         ? "The Arbeitsagentur's job search has changed or isn't answering. Try another source in Settings → Job search."
-        : `${name} answered in a way Dossier doesn't understand; its service may have changed. Try again later.`,
+        : source === "RWTH"
+          ? "The RWTH job portal has changed or isn't answering. Try another source in Settings → Job search."
+          : `${name} answered in a way Dossier doesn't understand; its service may have changed. Try again later.`,
   }[problem];
   return new JobSearchError(problem, message, detail ? `${source}: ${detail}` : undefined);
 }

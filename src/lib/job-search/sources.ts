@@ -75,6 +75,16 @@ export const SOURCE_INFO: Record<JobSource, SourceInfo> = {
     attributionLink: null,
     countries: ["de"],
   },
+  RWTH: {
+    name: "RWTH Aachen University",
+    description: "The university's own job portal: research, teaching and staff jobs in Aachen.",
+    tag: "Aachen only · free, no key",
+    keyUrl: null,
+    quotaPeriod: null,
+    attribution: null,
+    attributionLink: null,
+    countries: ["de"],
+  },
 };
 
 /** "LinkedIn via JSearch"; just the source's name for its own postings. */

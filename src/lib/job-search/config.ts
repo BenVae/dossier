@@ -38,6 +38,7 @@ const FROM_ENV: Record<NonNullable<Env["DOSSIER_JOBS_SOURCE"]>, JobSource | null
   jsearch: "JSEARCH",
   adzuna: "ADZUNA",
   arbeitsagentur: "ARBEITSAGENTUR",
+  rwth: "RWTH",
   off: null,
 };
 
@@ -134,5 +135,7 @@ export function credentialsFor<S extends JobSource>(config: JobSearchConfig, sou
       if (!config.arbeitsagentur.acceptedAt) throw jobSearchError("not-accepted", source);
       return {} as SourceCredentials[S];
     }
+    case "RWTH":
+      return {} as SourceCredentials[S];
   }
 }
