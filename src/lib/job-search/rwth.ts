@@ -19,8 +19,8 @@ import { EMPTY_QUERY, POSTED_WITHIN, type FoundPosting, type SearchPage, type Se
 const BASE = "https://www.rwth-aachen.de";
 const LISTINGS = "/cms/root/wir/Karriere/~buym/RWTH-Jobportal/lidx/1/";
 
-/** The keywords as the portal reads them: Latin-1, every byte percent-encoded. */
-const latin1 = (text: string) => Array.from(Buffer.from(text, "latin1"), (byte) => `%${byte.toString(16).padStart(2, "0")}`).join("");
+/** The keywords as the portal reads them: Latin-1, every byte percent-encoded, other characters as &#…; like a browser form. */
+const latin1 = (text: string) => Array.from(Buffer.from(text.replace(/[^\0-\xff]/gu, (char) => `&#${char.codePointAt(0)};`), "latin1"), (byte) => `%${byte.toString(16).padStart(2, "0")}`).join("");
 
 async function searchPage(query: SearchQuery, next: string | null, context: RequestContext = {}): Promise<SearchPage> {
   const page = Number(next?.replace("page:", "")) || 1;

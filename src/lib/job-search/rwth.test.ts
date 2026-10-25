@@ -17,8 +17,8 @@ afterEach(() => {
 describe("RWTH search", () => {
   it("asks the English listings with the keywords in Latin-1, as the portal reads them", async () => {
     const requests = stubFetch(() => latin1Page(rwthPage));
-    await rwth.search({ ...query, keywords: "Prüfung" }, {}, "page:2");
-    expect(requests[0].url.href).toBe("https://www.rwth-aachen.de/cms/root/wir/Karriere/~buym/RWTH-Jobportal/lidx/1/?search=%50%72%fc%66%75%6e%67&page=2");
+    await rwth.search({ ...query, keywords: "Prüfung – KI" }, {}, "page:2");
+    expect(requests[0].url.href).toBe("https://www.rwth-aachen.de/cms/root/wir/Karriere/~buym/RWTH-Jobportal/lidx/1/?search=%50%72%fc%66%75%6e%67%20%26%23%38%32%31%31%3b%20%4b%49&page=2");
   });
 
   it("maps the listings to the shared shape, with the Kennziffer as the id", async () => {
