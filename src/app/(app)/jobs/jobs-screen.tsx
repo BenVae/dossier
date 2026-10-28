@@ -150,8 +150,7 @@ export function JobsScreen({
           <SearchProblem problem={failed.problem.problem} message={failed.problem.message} onRetry={() => run(failed.query)} />
         ) : search ? (
           <PostingResults
-            // Taking a title out of the search shows it anew.
-            key={`${search.id}:${search.query.keywords}`}
+            key={search.id}
             mode="search"
             search={search}
             today={today}

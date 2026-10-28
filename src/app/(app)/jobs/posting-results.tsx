@@ -13,7 +13,7 @@ import { openPendingTab, sendPendingTab } from "@/lib/claude-tab";
 import { cn } from "@/lib/cn";
 import { fitBand, type PostingFit } from "@/lib/fit";
 import type { JobView } from "@/lib/jobs/runner";
-import { postedAgo, postingKey, type FoundPosting, type PostingState, type ShownPosting, type StoredSearch, type TitleOutcome } from "@/lib/job-search/search";
+import { postedAgo, postingKey, searchRunHref, type FoundPosting, type PostingState, type ShownPosting, type StoredSearch, type TitleOutcome } from "@/lib/job-search/search";
 import { arbeitsagenturPage, SOURCE_INFO } from "@/lib/job-search/sources";
 
 import {
@@ -171,7 +171,8 @@ export function PostingResults(props: PostingResultsProps) {
 
   const drop = async (title: string) => {
     if (props.mode !== "search") return;
-    if (toastResult(await dropTitleFromSearch({ searchId: props.search.id, title })).ok) router.refresh();
+    const result = toastResult(await dropTitleFromSearch({ searchId: props.search.id, title }));
+    if (result.ok) router.push(searchRunHref(result.data.id), { scroll: false });
   };
 
   const searched = props.mode === "search" ? props.search.query : null;
@@ -267,11 +268,12 @@ export function PostingResults(props: PostingResultsProps) {
 }
 
 /** What one title of the search found, or why it found nothing. */
-function titleStatus({ keys, total, more, problem }: TitleOutcome, name: string): string {
+function titleStatus({ keys, total, more, problem }: TitleOutcome, source: StoredSearch["source"]): string {
+  const { name, quotaPeriod } = SOURCE_INFO[source];
   const found = total === null ? `${keys.length} found${more ? ", more to come" : ""}` : `${keys.length} of ${total.toLocaleString("en-US")}`;
   if (!problem) return found;
   const why =
-    problem === "limited"
+    problem === "limited" || (problem === "quota" && !quotaPeriod)
       ? `${name} limited the search. Search again to retry`
       : problem === "quota"
         ? `Your ${name} searches are used up`
@@ -289,7 +291,7 @@ function TitleCounts({ titles, source, onDrop }: { titles: TitleOutcome[]; sourc
         <li key={title.title} className="flex items-center gap-3 border-b border-line py-1.5 last:border-b-0">
           <span className="min-w-0 flex-1 truncate font-medium text-ink">{title.title}</span>
           <span className={cn("text-right", title.problem ? "text-warning" : title.keys.length === 0 ? "text-faint" : "text-muted")}>
-            {titleStatus(title, SOURCE_INFO[source].name)}
+            {titleStatus(title, source)}
           </span>
           <button
             type="button"

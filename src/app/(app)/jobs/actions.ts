@@ -35,11 +35,12 @@ export const runJobSearch = action(z.object({ query: searchQuerySchema }), ({ qu
 /** "Show more": the next page, added to the kept search. */
 export const showMorePostings = action(z.object({ searchId }), ({ searchId }) => showMoreFor(searchId));
 
-/** ✕ on a title of a search with several: out of the kept search, without asking the source. */
+/** ✕ on a title of a search with several: the search without it, kept as a new one, without asking the source. */
 export const dropTitleFromSearch = action(z.object({ searchId, title: z.string().min(1).max(MAX_KEYWORDS) }), async ({ searchId, title }, { toast }) => {
-  await dropSearchTitle(searchId, title);
+  const id = await dropSearchTitle(searchId, title);
+  if (!id) throw new ActionError("That search is no longer kept. Search again.");
   toast(`Removed “${title}” from this search.`);
-  return null;
+  return { id };
 });
 
 /** Removes a kept search and what it found; saved postings stay. */

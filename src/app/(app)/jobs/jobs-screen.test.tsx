@@ -293,7 +293,7 @@ describe("the results", () => {
   });
 
   it("says how each title of a search with several went, and takes one out without searching", async () => {
-    vi.mocked(dropTitleFromSearch).mockResolvedValue({ ok: true, data: null });
+    vi.mocked(dropTitleFromSearch).mockResolvedValue({ ok: true, data: { id: "run-2" } });
     const titles: TitleOutcome[] = [
       { title: "designer", keys: ["JSEARCH:a"], total: null, more: true, problem: null },
       { title: "nurse", keys: [], total: null, more: false, problem: "limited" },
@@ -306,8 +306,19 @@ describe("the results", () => {
     ]);
     await userEvent.click(screen.getByRole("button", { name: "Remove “nurse” from this search" }));
     expect(dropTitleFromSearch).toHaveBeenCalledWith({ searchId: "run-1", title: "nurse" });
-    expect(router.refresh).toHaveBeenCalled();
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/jobs?search=run-2", { scroll: false }));
     expect(runJobSearch).not.toHaveBeenCalled();
+  });
+
+  it("says a source without a plan limited a title, not that its searches are used up", () => {
+    const titles: TitleOutcome[] = [
+      { title: "designer", keys: ["ARBEITSAGENTUR:a"], total: 40, more: true, problem: null },
+      { title: "nurse", keys: [], total: null, more: false, problem: "quota" },
+    ];
+    renderScreen({ search: { ...stored([posting("a")], "each:[]", titles), source: "ARBEITSAGENTUR" } });
+    expect(within(screen.getByRole("list", { name: "Titles in this search" })).getAllByRole("listitem")[1]).toHaveTextContent(
+      "Bundesagentur für Arbeit limited the search. Search again to retry",
+    );
   });
 
   it("leaves the titles out for a search of one", () => {

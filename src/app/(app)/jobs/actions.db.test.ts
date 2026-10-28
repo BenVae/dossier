@@ -83,8 +83,11 @@ describe("Find jobs actions", () => {
   it("takes a title out of a kept search of several", async () => {
     const titles = ["designer", "nurse"].map((title) => ({ title, keys: [], total: null, more: false, problem: null }));
     const search = await prisma().postingSearch.create({ data: { source: "JSEARCH", query: { ...query, keywords: "designer, nurse" }, postings: [], titles } });
-    expect(await dropTitleFromSearch({ searchId: search.id, title: "nurse" })).toEqual({ ok: true, data: null, toast: "Removed “nurse” from this search." });
-    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: search.id } })).toMatchObject({ query: { keywords: "designer" }, titles: [] });
+    const dropped = await dropTitleFromSearch({ searchId: search.id, title: "nurse" });
+    expect(dropped).toEqual({ ok: true, data: { id: expect.any(String) }, toast: "Removed “nurse” from this search." });
+    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: dropped.ok ? dropped.data.id : "" } })).toMatchObject({ query: { keywords: "designer" }, titles: [] });
+    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: search.id } })).toMatchObject({ query: { keywords: "designer, nurse" }, titles });
+    expect(await dropTitleFromSearch({ searchId: "gone", title: "nurse" })).toEqual({ ok: false, error: "That search is no longer kept. Search again." });
   });
 
   it("says why a search didn't run", async () => {

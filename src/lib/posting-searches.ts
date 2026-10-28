@@ -98,24 +98,26 @@ export async function showMoreFor(id: string): Promise<{ ok: true; postings: Sho
 }
 
 /**
- * Takes a title out of a kept search of several, with the postings only it
- * found, so Show more and the next search leave it out. Asks no source.
+ * Keeps a kept search of several without `title` and the postings only it
+ * found as a new search, and gives its id; the old one stays as it was, so
+ * the numbers Claude has for its postings still hold. Asks no source.
  */
-export async function dropSearchTitle(id: string, title: string): Promise<void> {
+export async function dropSearchTitle(id: string, title: string): Promise<string | null> {
   const search = await prisma.postingSearch.findUnique({ where: { id } });
-  if (!search) return;
+  if (!search) return null;
   const titles = titleOutcomesSchema.parse(search.titles);
   const index = titles.findIndex((entry) => entry.title === title);
-  if (index < 0 || titles.length < 2) return;
+  if (index < 0 || titles.length < 2) return null;
   const left = titles.toSpliced(index, 1);
   const stillFound = new Set(left.flatMap((entry) => entry.keys));
   const dropped = new Set(titles[index].keys.filter((key) => !stillFound.has(key)));
   const postings = postingsOf(search.postings).filter((posting) => !dropped.has(postingKey(posting)));
   const query = { ...queryOf(search.query), keywords: left.map((entry) => entry.title).join(", ") };
-  await prisma.postingSearch.update({
-    where: { id },
-    data: { query, postings, found: postings.length, next: nextWithoutTitle(search.next, index), titles: left.length > 1 ? left : [] },
+  const narrowed = await prisma.postingSearch.create({
+    data: { source: search.source, query, postings, found: postings.length, next: nextWithoutTitle(search.next, index), titles: left.length > 1 ? left : [] },
+    select: { id: true },
   });
+  return narrowed.id;
 }
 
 /** Every kept search, newest first, grouped by the day it ran in the user's time zone. */
