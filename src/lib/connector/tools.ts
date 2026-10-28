@@ -13,6 +13,7 @@ import { fitBand } from "@/lib/fit";
 import { countryCodeFor, countryName } from "@/lib/job-search/countries";
 import { fullText } from "@/lib/job-search/find";
 import { DEFAULT_RADIUS_KM, foundPostingSchema, POSTED_WITHIN, postingText, RADII_KM, type FoundPosting, type PostedWithin, type SearchQuery, type ShownPosting } from "@/lib/job-search/search";
+import { postingOrigin, sourceName } from "@/lib/job-search/sources";
 import { getJob, startJob } from "@/lib/jobs/runner";
 import { withoutPrivateParts } from "@/lib/letter-frame";
 import { fetchPosting } from "@/lib/posting-fetch";
@@ -52,7 +53,7 @@ function postingLine(posting: ShownPosting | FoundPosting, number: number) {
     remote: posting.remote,
     salary: posting.salary || undefined,
     posted: posting.postedAt?.slice(0, 10),
-    via: posting.via || undefined,
+    source: sourceName(posting),
     url: posting.url || undefined,
     saved: state?.saved || undefined,
     applied: state?.applicationId ? true : undefined,
@@ -81,7 +82,7 @@ const postingSource = {
 };
 
 type PostingSource = { posting_id?: string; paste_id?: string; search_id?: string; number?: number; posting_url?: string; posting_text?: string };
-type ResolvedPosting = { text: string; url: string; postingId: string | null; title?: string; company?: string; place?: string };
+type ResolvedPosting = { text: string; url: string; postingId: string | null; source?: string; title?: string; company?: string; place?: string };
 
 /** The whole text of a posting from a search, one handed over, a link or pasted text, or what's wrong. */
 async function resolvePosting(source: PostingSource): Promise<ResolvedPosting | { error: string }> {
@@ -91,7 +92,7 @@ async function resolvePosting(source: PostingSource): Promise<ResolvedPosting | 
     const found = foundFromPosting(row);
     const description = found.complete ? found.description : ((await fullText(found)) ?? found.description);
     if (!description.trim()) return { error: "That posting has no text to write from. Give its link as posting_url instead." };
-    return { text: postingText({ ...found, description }), url: found.url, postingId: row.id, title: found.title, company: found.company, place: found.place };
+    return { text: postingText({ ...found, description }), url: found.url, postingId: row.id, source: sourceName(found), title: found.title, company: found.company, place: found.place };
   }
   if (source.paste_id) {
     const pasted = await readPastedPosting(source.paste_id);
@@ -109,6 +110,7 @@ async function resolvePosting(source: PostingSource): Promise<ResolvedPosting | 
       text: postingText({ ...found, description }),
       url: found.url,
       postingId: (await storePosting(found)).id,
+      source: sourceName(found),
       title: found.title,
       company: found.company,
       place: found.place,
@@ -324,12 +326,15 @@ export function createDossierServer(origin: string): McpServer {
           status: true,
           postingUrl: true,
           postingText: true,
+          posting: { select: { source: true, via: true, url: true } },
+          agentCandidate: { select: { source: true, via: true, url: true } },
           match: true,
           documents: { select: { kind: true, units: true } },
         },
       });
       if (!application) return failure("That application no longer exists.");
       const doc = (kind: DocumentKind) => documentText(application.documents.find((document) => document.kind === kind)?.units);
+      const origin = postingOrigin(application);
       return text({
         id: application.id,
         title: application.title,
@@ -339,7 +344,8 @@ export function createDossierServer(origin: string): McpServer {
         mode: application.mode,
         salary: application.salary,
         status: statusInfo(application.status).label,
-        posting_url: application.postingUrl || undefined,
+        posting_url: origin.url || undefined,
+        posting_source: origin.source || undefined,
         posting: application.postingText.slice(0, 20_000),
         match: application.match,
         resume: doc(DocumentKind.RESUME),
@@ -354,7 +360,7 @@ export function createDossierServer(origin: string): McpServer {
     {
       title: "Read a posting",
       description:
-        "The whole text of a job posting, from a search (search_id and number), one Dossier handed over (posting_id or paste_id) or a link (posting_url), to write an application from or score.",
+        "The whole text of a job posting, with its link to apply through and where it was found, from a search (search_id and number), one Dossier handed over (posting_id or paste_id) or a link (posting_url), to write an application from or score.",
       inputSchema: z.object({
         posting_id: postingSource.posting_id,
         paste_id: postingSource.paste_id,
@@ -367,7 +373,7 @@ export function createDossierServer(origin: string): McpServer {
     async (input) => {
       const posting = await resolvePosting(input);
       if ("error" in posting) return failure(posting.error);
-      return text({ url: posting.url || undefined, title: posting.title, company: posting.company, place: posting.place, text: posting.text });
+      return text({ url: posting.url || undefined, source: posting.source, title: posting.title, company: posting.company, place: posting.place, text: posting.text });
     },
   );
 

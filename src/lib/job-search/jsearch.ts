@@ -44,7 +44,6 @@ const jobSchema = z.object({
     .array(z.object({ publisher: maybeText, apply_link: maybeText, is_direct: maybeFlag }))
     .nullish()
     .catch(null),
-  job_google_link: maybeText,
   job_description: maybeText,
   job_is_remote: maybeFlag,
   job_posted_at_datetime_utc: maybeText,
@@ -85,11 +84,11 @@ function postedAtOf(job: Job): string | null {
   return job.job_posted_at_timestamp ? new Date(job.job_posted_at_timestamp * 1000).toISOString() : null;
 }
 
-/** The employer's own apply link when there is one, else the publisher's. */
+/** The employer's own apply link when there is one, else the publisher's; never Google's results page. */
 function linkOf(job: Job): string {
   const options = job.apply_options ?? [];
   const direct = options.find((option) => option.is_direct && safeLink(option.apply_link));
-  return safeLink(direct?.apply_link) || safeLink(job.job_apply_link) || safeLink(options[0]?.apply_link) || safeLink(job.job_google_link);
+  return safeLink(direct?.apply_link) || safeLink(job.job_apply_link) || safeLink(options[0]?.apply_link);
 }
 
 /**
