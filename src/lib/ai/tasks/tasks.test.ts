@@ -65,7 +65,7 @@ describe("extractPosting", () => {
   it("reads the posting as data and returns typed requirements with an ISO deadline (NEW-3)", async () => {
     const provider = model({ ...extracted, title: null, deadline: "15 October 2026", requirements: [...extracted.requirements, { text: " ", kind: "other", skill: null, years: null, language: null }] });
     const { data, promptVersion } = await extractPosting(provider, { posting: sample.ledgerly.posting, today }, options);
-    expect(promptVersion).toBe("extract-posting@1");
+    expect(promptVersion).toBe("extract-posting@2");
     expect(data).toMatchObject({ title: "Senior Product Designer · Ledgerly", deadline: "2026-10-15", asksForReferences: false, language: "English" });
     expect(data.requirements).toHaveLength(7);
     expect(sent(provider).messages[0].content).toMatch(/^<posting>\nLedgerly: Senior Product Designer/);
@@ -74,6 +74,33 @@ describe("extractPosting", () => {
     expect(sent(provider).effort).toBe("low");
     // So "Apply by 15 October" gets the right year.
     expect(sent(provider).system).toContain("Today is 2026-09-28.");
+  });
+
+  it("asks once more when the answer names no company, role or title, and takes requirements without their empty fields", async () => {
+    const empty = { ...extracted, title: null, company: null, role: null };
+    const replies = [empty, { ...extracted, requirements: [{ text: "Figma", kind: "skill", skill: "Figma" }] }];
+    const provider = new MockProvider({ reply: () => replies.shift() });
+    const { data } = await extractPosting(provider, { posting, today }, options);
+    expect(provider.calls).toHaveLength(2);
+    expect(data).toMatchObject({ company: "Ledgerly", requirements: [{ text: "Figma", years: null, language: null }] });
+  });
+
+  it("keeps the first answer when one more look finds nothing either or fails, and stops when cancelled", async () => {
+    const empty = { ...extracted, title: null, company: null, role: null };
+    for (const second of [() => ({ ...empty, requirements: [] }), () => Promise.reject(new Error("socket hang up"))]) {
+      const replies = [() => empty, second];
+      const { data } = await extractPosting(new MockProvider({ reply: () => replies.shift()!() }), { posting, today }, options);
+      expect(data.requirements).toHaveLength(7);
+    }
+
+    const controller = new AbortController();
+    const cancelling = () => {
+      controller.abort();
+      return Promise.reject(new DOMException("The operation was aborted.", "AbortError"));
+    };
+    const replies = [() => empty, cancelling];
+    const reading = extractPosting(new MockProvider({ reply: () => replies.shift()!() }), { posting, today }, { ...options, signal: controller.signal });
+    await expect(reading).rejects.toMatchObject({ kind: "cancelled" });
   });
 
   it("only keeps whole dates", () => {
@@ -190,7 +217,7 @@ describe("tailorResume", () => {
 
   it("returns units, keeping only real roles and the profile's own skills (APP-4)", async () => {
     const { data, promptVersion } = await tailorResume(model(answer), { profile, extracted, match: null, facts: [], posting }, options);
-    expect(promptVersion).toBe("tailor-resume@5");
+    expect(promptVersion).toBe("tailor-resume@6");
     expect(data.map((unit) => unit.id)).toEqual([
       "summary",
       "experience:e1",
@@ -200,6 +227,7 @@ describe("tailorResume", () => {
       "skills",
       "education:d1",
       "education:d2",
+      "publication:u1",
       "languages",
     ]);
     expect(data.find((unit) => unit.id === "project:p1")).toEqual({
@@ -212,6 +240,19 @@ describe("tailorResume", () => {
     expect(data.find((unit) => unit.id === "experience:e2")?.text).toBe(profile.experience[1].bullets);
     expect(data.find((unit) => unit.id === "skills")?.text).toBe("Design systems · Figma · User research");
     expect(data.find((unit) => unit.id === "languages")?.text).toBe("Dutch: Native · English: Fluent (C2) · German: Intermediate (B1)");
+  });
+
+  it("copies the publications word for word, and sends their text but never their links (#218)", async () => {
+    const hidden = { id: "u2", citation: "Doe, J. (2020). *Kept off resumes.*", link: "https://doi.org/10.5555/hidden", onResumes: false };
+    const provider = model(answer);
+    const { data } = await tailorResume(provider, { profile: { ...profile, publications: [...profile.publications, hidden] }, extracted, match: null, facts: [], posting }, options);
+    expect(data.filter((unit) => unit.id.startsWith("publication:"))).toEqual([
+      { id: "publication:u1", label: "Publication “Doe, J., & Vermeer, K. (2016). Trust in…”", text: profile.publications[0].citation },
+    ]);
+    const text = prompt(provider);
+    expect(text).toContain(`"publications": [\n    "Doe, J., & Vermeer, K. (2016). Trust in automated scheduling`);
+    expect(text).not.toContain("10.5555");
+    expect(text).not.toContain("Kept off resumes");
   });
 
   it("names language levels in the resume's language: the chosen one, or the posting's", async () => {
@@ -415,7 +456,7 @@ describe("refineChat", () => {
       declined: false,
     };
     const { data, promptVersion } = await refineChat(model(answer), input, options);
-    expect(promptVersion).toBe("refine-chat@6");
+    expect(promptVersion).toBe("refine-chat@7");
     expect(data).toEqual({
       reply: "I made the letter more formal.",
       tone: "FORMAL",
@@ -426,6 +467,19 @@ describe("refineChat", () => {
         { document: "COVER_LETTER", unitId: "sign-off", text: "Kind regards,", previousText: "Warm regards," },
       ],
     });
+  });
+
+  it("never edits a publication (#218)", async () => {
+    const answer = {
+      reply: "Shortened your publication.",
+      edits: [{ document: "RESUME", unitId: "publication:u1", text: "Doe, J. (2016)." }],
+      tone: null,
+      declined: false,
+    };
+    const provider = model(answer);
+    const { data } = await refineChat(provider, input, options);
+    expect(data.edits).toEqual([]);
+    expect(sent(provider).system).toMatch(/Never edit a publication/);
   });
 
   it("declines with guidance instead of inventing facts (APP-9)", async () => {
@@ -520,3 +574,30 @@ describe("the fact guard in the writing tasks (E6-6)", () => {
   });
 });
 
+
+describe("the profile photo (#224)", () => {
+  const withPhoto = {
+    ...profile,
+    photo: { src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", onResumes: true },
+  };
+
+  it("is never in a prompt", async () => {
+    const calls = [
+      (provider: MockProvider) =>
+        tailorResume(provider, { profile: withPhoto, extracted, match: null, facts: [], posting }, options),
+      (provider: MockProvider) =>
+        writeCoverLetter(provider, { profile: withPhoto, extracted, match: null, tone: "WARM", facts: [], posting }, options),
+      (provider: MockProvider) =>
+        writeEmail(provider, { profile: withPhoto, extracted, match: null, tone: "WARM", facts: [], posting, letter: [] }, options),
+    ];
+    for (const call of calls) {
+      const provider = new MockProvider({ reply: () => ({}) });
+      // An empty answer fails, after a retry: what matters is what was sent.
+      await call(provider).catch(() => undefined);
+      expect(provider.calls.length).toBeGreaterThan(0);
+      for (const { system, messages } of provider.calls) {
+        expect([system, ...messages.map((message) => message.content)].join("\n")).not.toMatch(/data:image|iVBORw0KGgo|"photo"/);
+      }
+    }
+  });
+});
