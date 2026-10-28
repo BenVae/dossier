@@ -89,6 +89,16 @@ describe("searchPostings", () => {
     expect(requests).toHaveLength(3);
   });
 
+  it("goes on asking the other titles when a source without a plan limits one", async () => {
+    const requests = stubFetch(({ url }) => {
+      const was = url.searchParams.get("was")!;
+      return was === "a" ? json({}, { status: 429 }) : json({ ergebnisliste: [{ stellenangebotsTitel: was, referenznummer: was, firma: "Acme", stellenlokationen: [] }], maxErgebnisse: 1 });
+    });
+    const page = await searchPostings("ARBEITSAGENTUR", {}, { ...query, keywords: "a, b, c, d" });
+    expect(requests).toHaveLength(4);
+    expect(page.titles?.map((title) => title.problem)).toEqual(["quota", null, null, null]);
+  });
+
   it("says when a source doesn't cover the country, before asking it", async () => {
     const requests = stubFetch(() => json(jsearchV2Page));
     await expect(searchPostings("ARBEITSAGENTUR", {}, { ...query, country: "fr" })).rejects.toMatchObject({

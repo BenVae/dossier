@@ -9,7 +9,7 @@ import { adzuna } from "./adzuna";
 import { arbeitsagentur } from "./arbeitsagentur";
 import { jsearch } from "./jsearch";
 import { postingKey, splitTitles, type FoundPosting, type JobSource, type SearchPage, type SearchQuery } from "./search";
-import { sourceCovers } from "./sources";
+import { SOURCE_INFO, sourceCovers } from "./sources";
 
 // Searching the chosen job source from the server (E14-1). Results are
 // cached for half an hour; failures come back as JobSearchError with a
@@ -104,7 +104,7 @@ export async function searchPostings<S extends JobSource>(
         } catch (error) {
           if (!(error instanceof JobSearchError)) throw error;
           errors[index] = error;
-          if (error.problem === "key" || error.problem === "quota") stopped = error;
+          if (error.problem === "key" || (error.problem === "quota" && SOURCE_INFO[source].quotaPeriod)) stopped = error;
         }
         if (waiting < titles.length && !stopped && !signal.aborted) await new Promise((resolve) => setTimeout(resolve, SPACING_MS));
       }
