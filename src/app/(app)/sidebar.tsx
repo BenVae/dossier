@@ -20,7 +20,7 @@ function initials(name: string): string {
 
 /**
  * The signed-in sidebar: brand header, "+ New application", navigation, a
- * notice while a newer release is out, the theme switch and a link to the
+ * notice while main has a newer commit, the theme switch and a link to the
  * repository, and the account footer.
  */
 export function Sidebar({
@@ -71,7 +71,7 @@ export function Sidebar({
 
       {update && (
         <div className="px-2 pb-2 group-data-collapsed/sidebar:px-1">
-          <UpdateNotice release={update} currentVersion={currentVersion} />
+          <UpdateNotice release={update} />
         </div>
       )}
 

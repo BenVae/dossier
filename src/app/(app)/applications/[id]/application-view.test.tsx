@@ -100,7 +100,7 @@ const props: ApplicationViewProps = {
     archived: false,
     nextInterviewAt: null,
   },
-  posting: { text: "Ledgerly is hiring.\n\n  - Figma", url: "", pasted: "27 Sep" },
+  posting: { text: "Ledgerly is hiring.\n\n  - Figma", url: "", source: "", pasted: "27 Sep" },
   match: null,
   requirements: [],
   facts: [{ id: "f1", text: "I know their product as a customer." }],
@@ -712,6 +712,13 @@ describe("the Job posting tab (E8-7)", () => {
     expect(link).toHaveAttribute("href", "https://jobs.ledgerly.com/senior-designer");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("names where the posting was found", () => {
+    open({ posting: { ...props.posting, url: "https://jobs.ledgerly.com/senior-designer", source: "LinkedIn via JSearch" } });
+    expect(within(screen.getByRole("tabpanel")).getByText(/^Job posting · LinkedIn via JSearch/)).toContainElement(
+      screen.getByRole("link", { name: "jobs.ledgerly.com/senior-designer (opens in a new tab)" }),
+    );
   });
 
   it("shows only the posting when it wasn't matched", () => {

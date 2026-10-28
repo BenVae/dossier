@@ -86,5 +86,9 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 COPY docker/start.sh ./start.sh
+# The commit the image is built from, for the update check (src/lib/version.ts).
+# scripts/install-windows.ps1 passes it; without it, the check can't tell.
+ARG DOSSIER_COMMIT=
+ENV DOSSIER_COMMIT=$DOSSIER_COMMIT
 # Migrations, the seed, then the server (E12-3).
 CMD ["./start.sh"]

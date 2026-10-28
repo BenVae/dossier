@@ -226,11 +226,23 @@ describe("the results", () => {
     const items = within(list).getAllByRole("button", { name: /^Designer/ });
     expect(items.map((item) => item.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
     expect(items[0]).toHaveTextContent("Company a · Hamburg · Remote");
-    expect(items[0]).toHaveTextContent("3 days ago · via LinkedIn · EUR 70,000 a year");
+    expect(items[0]).toHaveTextContent("3 days ago · LinkedIn via JSearch · EUR 70,000 a year");
     expect(screen.getByRole("heading", { level: 2, name: "Designer a" })).toBeInTheDocument();
+    expect(screen.getByText("Posted 3 days ago · LinkedIn via JSearch")).toBeInTheDocument();
     expect(screen.getByText("The whole posting a.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Open posting/ })).toHaveAttribute("href", "https://jobs.example/a");
-    expect(screen.getByRole("link", { name: /Open posting/ })).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getByRole("link", { name: /^Open posting ?\(/ })).toHaveAttribute("href", "https://jobs.example/a");
+    expect(screen.getByRole("link", { name: /^Open posting ?\(/ })).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("links each posting in the list to its ad, and names where it was found", () => {
+    renderScreen({ search: stored([posting("a"), posting("b", { via: "" }), posting("c", { url: "" })]) });
+    const list = screen.getByRole("list", { name: "Postings" });
+    const link = within(list).getByRole("link", { name: /^Open posting ?“Designer a”/ });
+    expect(link).toHaveAttribute("href", "https://jobs.example/a");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(within(list).getByRole("button", { name: /^Designer b/ })).toHaveTextContent("3 days ago · JSearch");
+    expect(within(list).queryByRole("link", { name: /“Designer c”/ })).not.toBeInTheDocument();
   });
 
   it("shows another posting when it's picked, and moves with the arrow keys", async () => {
@@ -466,7 +478,7 @@ describe("the Bundesagentur für Arbeit (#223)", () => {
   it("links each posting to its ad on arbeitsagentur.de, next to the employer's own link", () => {
     const ba = posting("10000-1234-S", { source: "ARBEITSAGENTUR", url: "https://careers.example/1" });
     renderScreen({ source: "ARBEITSAGENTUR", search: stored([ba]) });
-    expect(screen.getByRole("link", { name: /Open posting/ })).toHaveAttribute("href", "https://careers.example/1");
+    expect(screen.getByRole("link", { name: /^Open posting ?\(/ })).toHaveAttribute("href", "https://careers.example/1");
     expect(screen.getByRole("link", { name: /On arbeitsagentur\.de/ })).toHaveAttribute("href", "https://www.arbeitsagentur.de/jobsuche/jobdetail/10000-1234-S");
   });
 

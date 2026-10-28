@@ -14,7 +14,7 @@ vi.mock("@/components/toast", () => ({ toast: vi.fn() }));
 
 const updates = { daily: true, available: null };
 const ping: UsagePingView = { host: "telemetry.example.com", choice: "on", source: "app", id: "6f1c0e5a-9b1d-4c3e-8f2a-1d2e3f4a5b6c", production: true };
-const release = { version: "0.2.0", url: "https://github.com/AienTech/dossier/releases/tag/v0.2.0" };
+const release = { version: "b".repeat(40), url: `https://github.com/BenVae/dossier/compare/${"a".repeat(40)}...${"b".repeat(40)}` };
 const facts = [
   { label: "Version", value: "0.1.0" },
   { label: "Database", value: "PostgreSQL · 9.0 MB" },
@@ -71,7 +71,7 @@ describe("About (E10-9)", () => {
     render(<AboutSection facts={facts} usagePing={ping} updates={updates} />);
     const toggle = screen.getByRole("switch", { name: "Check for updates daily" });
     expect(toggle).toHaveAttribute("aria-checked", "true");
-    expect(toggle).toHaveAccessibleDescription(/asks GitHub for the latest release, and the sidebar says when a newer one is out/);
+    expect(toggle).toHaveAccessibleDescription(/asks GitHub for the latest commit on BenVae\/dossier's main branch, and the sidebar says when it's newer than this install/);
     await user.click(toggle);
     expect(updateSettings).toHaveBeenCalledWith({ updateCheck: false });
     expect(toggle).toHaveAccessibleDescription("Off. Dossier only checks when you press Check for updates.");
@@ -88,8 +88,11 @@ describe("About (E10-9)", () => {
 
   it("shows a newer version a check already found, with how to update", () => {
     render(<AboutSection facts={facts} usagePing={ping} updates={{ daily: true, available: release }} />);
-    expect(screen.getByRole("status")).toHaveTextContent("Version 0.2.0 is available.");
-    expect(screen.getByRole("link", { name: "How to update (opens in a new tab)" })).toHaveAttribute("href", "https://github.com/AienTech/dossier/wiki/Upgrading");
+    expect(screen.getByRole("status")).toHaveTextContent("A newer version of Ben's Dossier is available.");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "To update, run the setup command again in PowerShell:irm https://raw.githubusercontent.com/BenVae/dossier/main/scripts/install-windows.ps1 | iex",
+    );
+    expect(screen.getByRole("link", { name: "See what's new (opens in a new tab)" })).toHaveAttribute("href", release.url);
     expect(checkUpdates).not.toHaveBeenCalled();
   });
 
@@ -106,7 +109,7 @@ describe("About (E10-9)", () => {
     vi.mocked(checkUpdates).mockResolvedValueOnce({ ok: true, data: { status: "newer", ...release } });
     render(<AboutSection facts={facts} usagePing={ping} updates={updates} />);
     await user.click(screen.getByRole("button", { name: "Check for updates" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Version 0.2.0 is available.");
+    expect(screen.getByRole("status")).toHaveTextContent("A newer version of Ben's Dossier is available.");
     expect(screen.getByRole("link", { name: "See what's new (opens in a new tab)" })).toHaveAttribute("rel", "noopener noreferrer");
   });
 
@@ -116,5 +119,13 @@ describe("About (E10-9)", () => {
     render(<AboutSection facts={facts} usagePing={ping} updates={updates} />);
     await user.click(screen.getByRole("button", { name: "Check for updates" }));
     expect(screen.getByRole("status")).toHaveTextContent("Couldn't check for updates right now.");
+  });
+
+  it("says when this install can't tell, not knowing its own commit", async () => {
+    const user = userEvent.setup();
+    vi.mocked(checkUpdates).mockResolvedValueOnce({ ok: true, data: { status: "untracked" } });
+    render(<AboutSection facts={facts} usagePing={ping} updates={updates} />);
+    await user.click(screen.getByRole("button", { name: "Check for updates" }));
+    expect(screen.getByRole("status")).toHaveTextContent("This install doesn't know which commit it was built from, so it can't tell whether there's a newer one.");
   });
 });

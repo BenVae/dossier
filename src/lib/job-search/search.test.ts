@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { cached, CACHE_TTL_MS, clearJobSearchCache, remember } from "./cache";
 import { countryCodeFor, countryName, COUNTRIES } from "./countries";
 import { jobSearchError } from "./errors";
+import { postingOrigin, sourceName } from "./sources";
 import {
   defaultSearch,
   EMPTY_QUERY,
@@ -135,6 +136,19 @@ describe("postings", () => {
     expect(linkKey("https://de.indeed.com/viewjob?from=serp&jk=abc123")).toBe("de.indeed.com/viewjob?jk=abc123");
     expect(linkKey("https://jobs.example/a?b=2&a=1#apply")).toBe("jobs.example/a?a=1&b=2");
     expect(linkKey("not a link")).toBe("");
+  });
+
+  it("names where a posting was found", () => {
+    expect(sourceName(posting)).toBe("Indeed via JSearch");
+    expect(sourceName({ source: "ARBEITSAGENTUR", via: "" })).toBe("Bundesagentur für Arbeit");
+  });
+
+  it("keeps an application's link, else the one of the posting it was made from", () => {
+    const from = { source: "JSEARCH" as const, via: "LinkedIn", url: "https://jobs.example/1" };
+    expect(postingOrigin({ postingUrl: "https://careers.example/1", posting: from, agentCandidate: null })).toEqual({ url: "https://careers.example/1", source: "LinkedIn via JSearch" });
+    expect(postingOrigin({ postingUrl: "", posting: from, agentCandidate: null })).toEqual({ url: "https://jobs.example/1", source: "LinkedIn via JSearch" });
+    expect(postingOrigin({ postingUrl: "", posting: null, agentCandidate: { ...from, via: "" } })).toEqual({ url: "https://jobs.example/1", source: "JSearch" });
+    expect(postingOrigin({ postingUrl: "javascript:alert(1)", posting: null, agentCandidate: null })).toEqual({ url: "", source: "" });
   });
 
   it("keeps only web links", () => {

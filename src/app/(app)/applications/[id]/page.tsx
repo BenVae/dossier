@@ -14,6 +14,7 @@ import { emailJobKey } from "@/lib/jobs/write-email";
 import { googleConnection } from "@/lib/google/account";
 import { pullInterviewEvents } from "@/lib/google/availability";
 import { loadConversation } from "@/lib/google/inbox-data";
+import { postingOrigin } from "@/lib/job-search/sources";
 import { refineSuggestions } from "@/lib/refine-suggestions";
 import { loadThemes } from "@/lib/theme-data";
 import { userTimeZone } from "@/lib/time-zone";
@@ -96,8 +97,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
       timeZone={timeZone}
       posting={{
         text: application.postingText,
-        // New applications only keep web links, but an imported file could carry any URL (E11-5).
-        url: /^https?:\/\//i.test(application.postingUrl) ? application.postingUrl : "",
+        ...postingOrigin(application),
         pasted: formatShortDate(application.createdAt),
       }}
       match={match}

@@ -117,6 +117,11 @@ describe("JSearch search", () => {
     expect(requests[0].url.href).toMatch(/^http:\/\/127\.0\.0\.1:3998\/jsearch\/search-v2\?/);
   });
 
+  it("never keeps Google's results page as the link", async () => {
+    stubFetch(() => json({ data: { jobs: [{ job_id: "g", job_google_link: "https://www.google.com/search?q=jobs&ibp=htl;jobs#htidocid=abc" }], cursor: null } }));
+    expect((await jsearch.search(query, ninja, null)).postings[0].url).toBe("");
+  });
+
   it("drops links that aren't web addresses, and reads salaries written as text", async () => {
     stubFetch(() =>
       json({

@@ -107,8 +107,15 @@ describe("the Claude connector's tools (#221)", () => {
 
     const ledgerly = await prisma().application.findFirstOrThrow({ where: { company: "Ledgerly" }, include: { documents: true } });
     await prisma().note.create({ data: { applicationId: ledgerly.id, body: "Private: salary floor 80k" } });
+    await prisma().posting.create({ data: { source: "JSEARCH", externalId: "ledgerly-1", via: "LinkedIn", url: "https://jobs.example/ledgerly", applicationId: ledgerly.id } });
     const one = await tool("get_application", { id: ledgerly.id });
-    expect(one.json).toMatchObject({ id: ledgerly.id, company: "Ledgerly", link: `https://dossier.example/applications/${ledgerly.id}` });
+    expect(one.json).toMatchObject({
+      id: ledgerly.id,
+      company: "Ledgerly",
+      posting_url: "https://jobs.example/ledgerly",
+      posting_source: "LinkedIn via JSearch",
+      link: `https://dossier.example/applications/${ledgerly.id}`,
+    });
     expect(one.json.resume).toContain("## Summary");
     expect(one.text).not.toContain("Private: salary floor");
     expect(one.json.cover_letter).not.toContain("## Sender");
@@ -128,7 +135,7 @@ describe("the Claude connector's tools (#221)", () => {
 
   it("reads a posting from wherever Claude got it", async () => {
     const search = await storeSearch([found("p1", "Product Designer"), found("p2", "Brand Designer", false)]);
-    expect((await tool("get_posting", { search_id: search.id, number: 1 })).json).toMatchObject({ title: "Product Designer", url: "https://jobs.example/p1" });
+    expect((await tool("get_posting", { search_id: search.id, number: 1 })).json).toMatchObject({ title: "Product Designer", url: "https://jobs.example/p1", source: "JSearch" });
     expect((await tool("get_posting", { search_id: search.id, number: 2 })).json.text).toContain("The whole posting from its source");
     expect(await tool("get_posting", { search_id: search.id, number: 9 })).toMatchObject({ isError: true });
 

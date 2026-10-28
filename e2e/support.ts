@@ -13,6 +13,8 @@ export const FAKE_AI_PORT = 3999;
 export const FAKE_JOBS_PORT = 3998;
 export const FAKE_GOOGLE_PORT = 3997;
 export const PASSWORD = "e2e-password";
+/** The commit the app says it was built from, as the setup script's image does (DOSSIER_COMMIT). */
+export const COMMIT = "e2e0".repeat(10);
 /** DOSSIER_PASSWORD for the run: `printf 'e2e-password' | yarn hash-password`. */
 const PASSWORD_HASH = "argon2id:m=19456,t=2,p=1:wk-0a22NLDwpNVDMxLY9rw:x4bAXEh9EtlaTIqLiHwF_omyDOpcPtwPrV0_SJx_y2c";
 export const STORAGE_STATE = "e2e/.auth/state.json";
@@ -51,8 +53,9 @@ export function appEnv(): Record<string, string> {
     // Google's sign-in, Gmail and Calendar are the fake Google's (E15). It's
     // only used once a spec enters an OAuth client in Settings → Google.
     DOSSIER_GOOGLE_TEST_BASE_URL: `http://localhost:${FAKE_GOOGLE_PORT}`,
-    // A production server, so it would ask GitHub for the latest release daily.
+    // A production server, so it would ask GitHub for the latest commit daily.
     DOSSIER_UPDATES_TEST_BASE_URL: `http://localhost:${FAKE_JOBS_PORT}/github`,
+    DOSSIER_COMMIT: COMMIT,
     // A production server asks whether to send the usage ping (#172); resetData
     // answers no, and a yes sends it to the fake job sources, never the project.
     DOSSIER_USAGE_PING_TEST_URL: `http://localhost:${FAKE_JOBS_PORT}/ping`,

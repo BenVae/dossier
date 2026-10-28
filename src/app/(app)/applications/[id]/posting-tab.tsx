@@ -15,6 +15,8 @@ export type PostingData = {
   text: string;
   /** The saved link to the posting, or "". */
   url: string;
+  /** Where it was found, e.g. "LinkedIn via JSearch", or "". */
+  source: string;
   /** When it was pasted, e.g. "27 Sep". */
   pasted: string;
 };
@@ -81,6 +83,7 @@ export function PostingTab({
       <div className="flex w-full max-w-[640px] flex-wrap justify-between gap-x-3 gap-y-1 text-meta text-muted">
         <span className="min-w-0">
           Job posting
+          {posting.source && ` · ${posting.source}`}
           {posting.url && (
             <>
               {" · "}
