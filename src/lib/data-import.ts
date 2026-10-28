@@ -189,7 +189,12 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
         data: postings.map((posting) => ({ ...posting, applicationId: posting.applicationId && applicationIds.has(posting.applicationId) ? posting.applicationId : null })),
       });
       await tx.postingSearch.createMany({
-        data: searches.map((search) => ({ ...search, query: (search.query ?? {}) as Prisma.InputJsonValue, postings: (search.postings ?? []) as Prisma.InputJsonValue })),
+        data: searches.map((search) => ({
+          ...search,
+          query: (search.query ?? {}) as Prisma.InputJsonValue,
+          postings: (search.postings ?? []) as Prisma.InputJsonValue,
+          titles: (search.titles ?? []) as Prisma.InputJsonValue,
+        })),
       });
       // The job agent's candidates (E16), so what it saw stays seen; a draft that isn't in the file leaves it unlinked.
       await tx.agentCandidate.createMany({

@@ -147,21 +147,31 @@ describe("importExport (E10-6)", () => {
     expect(await prisma().posting.findFirstOrThrow({ where: { externalId: "job-1" } })).toMatchObject({ applicationId: null });
   });
 
-  it("restores past searches with what they found (E14-10)", async () => {
+  it("restores past searches with what they found (E14-10), and how each title went", async () => {
+    const titles = [
+      { title: "designer", keys: ["JSEARCH:job-1"], total: null, more: true, problem: null },
+      { title: "researcher", keys: [], total: null, more: false, problem: "limited" },
+    ];
     await prisma().postingSearch.create({
-      data: { source: "JSEARCH", query: { keywords: "designer" }, postings: [{ externalId: "job-1" }], found: 1, next: "cursor:2", createdAt: now },
+      data: { source: "JSEARCH", query: { keywords: "designer, researcher" }, postings: [{ externalId: "job-1" }], found: 1, next: "cursor:2", titles, createdAt: now },
     });
     const file = await asFile();
     expect(file.searches).toHaveLength(1);
     await prisma().postingSearch.deleteMany();
     await importExport(prisma(), file);
     expect(await prisma().postingSearch.findFirstOrThrow()).toMatchObject({
-      query: { keywords: "designer" },
+      query: { keywords: "designer, researcher" },
       postings: [{ externalId: "job-1" }],
       found: 1,
       next: "cursor:2",
+      titles,
       createdAt: now,
     });
+
+    // A file from before titles were kept.
+    await prisma().postingSearch.deleteMany();
+    await importExport(prisma(), { ...file, searches: file.searches.map((search) => ({ ...search, titles: undefined })) });
+    expect((await prisma().postingSearch.findFirstOrThrow()).titles).toEqual([]);
   });
 
   it("restores the job agent's candidates and drafts, so what it saw stays seen (E16)", async () => {
