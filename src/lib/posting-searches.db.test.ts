@@ -198,6 +198,15 @@ describe("a search of several titles", () => {
       ["designer", 2, true, null],
       ["researcher", 0, false, "limited"],
     ]);
+
+    // Show more asks only designer; researcher still says it was limited.
+    const requests = answers();
+    expect(await showMoreFor(id)).toMatchObject({ ok: true, titles: [{ title: "designer", problem: null }, { title: "researcher", problem: "limited" }] });
+    expect(requests).toHaveLength(1);
+    expect(await titlesOf(id)).toEqual([
+      ["designer", 2, false, null],
+      ["researcher", 0, false, "limited"],
+    ]);
   });
 
   it("adds each title's next page to what it found", async () => {

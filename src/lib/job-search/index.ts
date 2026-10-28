@@ -78,7 +78,8 @@ export async function searchPostings<S extends JobSource>(
     const cursors: (string | null)[] | null = next ? JSON.parse(next.slice(EACH.length)) : null;
     const deadline = AbortSignal.timeout(SEARCH_DEADLINE_MS);
     const signal = context.signal ? AbortSignal.any([context.signal, deadline]) : deadline;
-    // A title that fails keeps the cursor it was asked with, so Show more asks it again.
+    // A title that fails keeps the cursor it was asked with, so Show more asks it again; one
+    // that fails on the first page has none, and is asked again by searching again.
     const pages: SearchPage[] = titles.map((_, index) => ({ postings: [], next: cursors?.[index] ?? null }));
     const errors: (JobSearchError | null)[] = titles.map(() => null);
     let waiting = 0;
@@ -103,7 +104,7 @@ export async function searchPostings<S extends JobSource>(
           if (!(error instanceof JobSearchError)) throw error;
           errors[index] = error;
         }
-        if (waiting < titles.length) await new Promise((resolve) => setTimeout(resolve, SPACING_MS));
+        if (waiting < titles.length && !signal.aborted) await new Promise((resolve) => setTimeout(resolve, SPACING_MS));
       }
     };
     await Promise.all(Array.from({ length: AT_ONCE }, work));

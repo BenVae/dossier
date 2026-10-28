@@ -90,7 +90,7 @@ export async function showMoreFor(id: string): Promise<{ ok: true; postings: Sho
   const postings = [...before, ...added];
   const titles = kept.map((title) => {
     const page = answer.titles?.find((entry) => entry.title === title.title);
-    if (!page) return title;
+    if (!page || !title.more) return title;
     return { ...page, keys: [...new Set([...title.keys, ...page.keys])], total: page.total ?? title.total };
   });
   await prisma.postingSearch.update({ where: { id }, data: { postings, found: postings.length, next: answer.next, titles } });
