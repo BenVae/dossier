@@ -62,6 +62,7 @@ export function PostingResults(props: PostingResultsProps) {
   const [titles, setTitles] = useState(mode === "search" ? props.search.titles : []);
   const router = useRouter();
   const [loadingMore, setLoadingMore] = useState(false);
+  const [dropping, setDropping] = useState(false);
   const [showDismissed, setShowDismissed] = useState(false);
   const inView = ({ state }: ShownPosting) => (mode === "saved" ? state.saved : mode === "dismissed" ? state.dismissed : showDismissed || !state.dismissed);
   const visible = postings.filter(inView);
@@ -170,9 +171,11 @@ export function PostingResults(props: PostingResultsProps) {
   };
 
   const drop = async (title: string) => {
-    if (props.mode !== "search") return;
+    if (props.mode !== "search" || dropping) return;
+    setDropping(true);
     const result = toastResult(await dropTitleFromSearch({ searchId: props.search.id, title }));
     if (result.ok) router.push(searchRunHref(result.data.id), { scroll: false });
+    else setDropping(false);
   };
 
   const searched = props.mode === "search" ? props.search.query : null;
@@ -222,7 +225,7 @@ export function PostingResults(props: PostingResultsProps) {
         </p>
 
         {props.mode === "search" && (titles.length > 1 || titles[0]?.problem) && (
-          <TitleCounts titles={titles} source={props.search.source} onDrop={titles.length > 1 ? (title) => void drop(title) : undefined} />
+          <TitleCounts titles={titles} source={props.search.source} dropping={dropping} onDrop={titles.length > 1 ? (title) => void drop(title) : undefined} />
         )}
 
         {visible.length === 0 ? (
@@ -284,7 +287,17 @@ function titleStatus({ keys, total, more, problem }: TitleOutcome, source: Store
 }
 
 /** How many postings each title found, with × to take one out of the search when there are several. */
-function TitleCounts({ titles, source, onDrop }: { titles: TitleOutcome[]; source: StoredSearch["source"]; onDrop?: (title: string) => void }) {
+function TitleCounts({
+  titles,
+  source,
+  dropping,
+  onDrop,
+}: {
+  titles: TitleOutcome[];
+  source: StoredSearch["source"];
+  dropping: boolean;
+  onDrop?: (title: string) => void;
+}) {
   return (
     <ul aria-label="Titles in this search" className="flex flex-col rounded-card border border-line-card bg-card px-4 py-1 text-meta">
       {titles.map((title) => (
@@ -297,8 +310,9 @@ function TitleCounts({ titles, source, onDrop }: { titles: TitleOutcome[]; sourc
             <button
               type="button"
               aria-label={`Remove “${title.title}” from this search`}
+              aria-disabled={dropping || undefined}
               onClick={() => onDrop(title.title)}
-              className="rounded-control px-1.5 py-1 text-base leading-none text-muted hover:text-ink"
+              className="rounded-control px-1.5 py-1 text-base leading-none text-muted hover:text-ink aria-disabled:text-faint"
             >
               <span aria-hidden="true">×</span>
             </button>

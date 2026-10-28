@@ -307,6 +307,8 @@ describe("the results", () => {
     await userEvent.click(screen.getByRole("button", { name: "Remove “nurse” from this search" }));
     expect(dropTitleFromSearch).toHaveBeenCalledWith({ searchId: "run-1", title: "nurse" });
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/jobs?search=run-2", { scroll: false }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove “designer” from this search" }));
+    expect(dropTitleFromSearch).toHaveBeenCalledTimes(1);
     expect(runJobSearch).not.toHaveBeenCalled();
   });
 

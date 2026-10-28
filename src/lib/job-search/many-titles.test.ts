@@ -40,6 +40,7 @@ describe("several titles on JSearch", { timeout: 30_000 }, () => {
 
   it("keeps what the titles found when others are refused, and says per title what happened", async () => {
     const page = await search(10, { monthlyLeft: 6 });
+    expect(mock.stats.requests).toBeLessThan(10);
     expect(page.postings).toHaveLength(18);
     expect(problems(page)).toEqual([null, null, null, null, null, null, "quota", "quota", "quota", "quota"]);
     expect(page.titles?.[6]).toMatchObject({ title: "typescript developer", keys: [], more: false });
@@ -52,8 +53,9 @@ describe("several titles on JSearch", { timeout: 30_000 }, () => {
     await expect(search(1, { monthlyLeft: 0 })).rejects.toMatchObject({ problem: "quota", message: expect.stringContaining("this month") });
   });
 
-  it("fails the search only when every title failed", async () => {
+  it("fails the search only when every title failed, and stops asking once the plan is used up", async () => {
     await expect(search(5, { monthlyLeft: 0 })).rejects.toMatchObject({ problem: "quota" });
+    expect(mock.stats.requests).toBe(3);
   });
 
   it("stops at the search's deadline, keeping the titles that answered", async () => {

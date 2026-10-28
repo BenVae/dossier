@@ -83,6 +83,7 @@ export async function searchPostings<S extends JobSource>(
     const pages: SearchPage[] = titles.map((_, index) => ({ postings: [], next: cursors?.[index] ?? null }));
     const errors: (JobSearchError | null)[] = titles.map(() => null);
     let waiting = 0;
+    let stopped: JobSearchError | null = null;
     const work = async () => {
       while (waiting < titles.length) {
         const index = waiting++;
@@ -94,8 +95,8 @@ export async function searchPostings<S extends JobSource>(
           pages[index] = hit;
           continue;
         }
-        if (signal.aborted) {
-          errors[index] = jobSearchError("unavailable", source);
+        if (stopped || signal.aborted) {
+          errors[index] = stopped ?? jobSearchError("unavailable", source);
           continue;
         }
         try {
@@ -103,8 +104,9 @@ export async function searchPostings<S extends JobSource>(
         } catch (error) {
           if (!(error instanceof JobSearchError)) throw error;
           errors[index] = error;
+          if (error.problem === "key" || error.problem === "quota") stopped = error;
         }
-        if (waiting < titles.length && !signal.aborted) await new Promise((resolve) => setTimeout(resolve, SPACING_MS));
+        if (waiting < titles.length && !stopped && !signal.aborted) await new Promise((resolve) => setTimeout(resolve, SPACING_MS));
       }
     };
     await Promise.all(Array.from({ length: AT_ONCE }, work));

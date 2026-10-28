@@ -83,6 +83,12 @@ describe("searchPostings", () => {
     expect(log).toHaveBeenCalledTimes(1);
   });
 
+  it("stops asking the other titles once the source refuses the key", async () => {
+    const requests = stubFetch(() => json({}, { status: 401 }));
+    await expect(searchPostings("JSEARCH", ninja, { ...query, keywords: "a, b, c, d, e" })).rejects.toMatchObject({ problem: "key" });
+    expect(requests).toHaveLength(3);
+  });
+
   it("says when a source doesn't cover the country, before asking it", async () => {
     const requests = stubFetch(() => json(jsearchV2Page));
     await expect(searchPostings("ARBEITSAGENTUR", {}, { ...query, country: "fr" })).rejects.toMatchObject({
