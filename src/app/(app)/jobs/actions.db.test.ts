@@ -85,7 +85,7 @@ describe("Find jobs actions", () => {
     const search = await prisma().postingSearch.create({ data: { source: "JSEARCH", query: { ...query, keywords: "designer, nurse" }, postings: [], titles } });
     const dropped = await dropTitleFromSearch({ searchId: search.id, title: "nurse" });
     expect(dropped).toEqual({ ok: true, data: { id: expect.any(String) }, toast: "Removed “nurse” from this search." });
-    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: dropped.ok ? dropped.data.id : "" } })).toMatchObject({ query: { keywords: "designer" }, titles: [] });
+    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: dropped.ok ? dropped.data.id : "" } })).toMatchObject({ query: { keywords: "designer" }, titles: [titles[0]] });
     expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: search.id } })).toMatchObject({ query: { keywords: "designer, nurse" }, titles });
     expect(await dropTitleFromSearch({ searchId: "gone", title: "nurse" })).toEqual({ ok: false, error: "That search is no longer kept. Search again." });
   });

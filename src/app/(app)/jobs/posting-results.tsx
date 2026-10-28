@@ -221,8 +221,8 @@ export function PostingResults(props: PostingResultsProps) {
           )}
         </p>
 
-        {props.mode === "search" && titles.length > 1 && (
-          <TitleCounts titles={titles} source={props.search.source} onDrop={(title) => void drop(title)} />
+        {props.mode === "search" && (titles.length > 1 || titles[0]?.problem) && (
+          <TitleCounts titles={titles} source={props.search.source} onDrop={titles.length > 1 ? (title) => void drop(title) : undefined} />
         )}
 
         {visible.length === 0 ? (
@@ -283,8 +283,8 @@ function titleStatus({ keys, total, more, problem }: TitleOutcome, source: Store
   return keys.length > 0 ? `${found} · ${why}` : why;
 }
 
-/** How many postings each title found, for a search of several, with × to take one out of the search. */
-function TitleCounts({ titles, source, onDrop }: { titles: TitleOutcome[]; source: StoredSearch["source"]; onDrop: (title: string) => void }) {
+/** How many postings each title found, with × to take one out of the search when there are several. */
+function TitleCounts({ titles, source, onDrop }: { titles: TitleOutcome[]; source: StoredSearch["source"]; onDrop?: (title: string) => void }) {
   return (
     <ul aria-label="Titles in this search" className="flex flex-col rounded-card border border-line-card bg-card px-4 py-1 text-meta">
       {titles.map((title) => (
@@ -293,14 +293,16 @@ function TitleCounts({ titles, source, onDrop }: { titles: TitleOutcome[]; sourc
           <span className={cn("text-right", title.problem ? "text-warning" : title.keys.length === 0 ? "text-faint" : "text-muted")}>
             {titleStatus(title, source)}
           </span>
-          <button
-            type="button"
-            aria-label={`Remove “${title.title}” from this search`}
-            onClick={() => onDrop(title.title)}
-            className="rounded-control px-1.5 py-1 text-base leading-none text-muted hover:text-ink"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
+          {onDrop && (
+            <button
+              type="button"
+              aria-label={`Remove “${title.title}” from this search`}
+              onClick={() => onDrop(title.title)}
+              className="rounded-control px-1.5 py-1 text-base leading-none text-muted hover:text-ink"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          )}
         </li>
       ))}
     </ul>

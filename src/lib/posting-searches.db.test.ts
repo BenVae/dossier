@@ -207,6 +207,20 @@ describe("a search of several titles", () => {
       ["designer", 2, false, null],
       ["researcher", 0, false, "limited"],
     ]);
+
+    // Left on its own, researcher still says it was limited.
+    const alone = (await dropSearchTitle(id, "designer"))!;
+    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: alone } })).toMatchObject({ found: 0, next: null });
+    expect(await titlesOf(alone)).toEqual([["researcher", 0, false, "limited"]]);
+  });
+
+  it("forgets a lone title's problem once Show more gets its next page", async () => {
+    await useJSearch();
+    const titles = [{ title: "researcher", keys: ["JSEARCH:kept"], total: null, more: true, problem: "limited" }];
+    const search = await prisma().postingSearch.create({ data: { source: "JSEARCH", query: { ...query, keywords: "researcher" }, postings: [], next: "cursor:MORE", titles } });
+    answers();
+    expect(await showMoreFor(search.id)).toMatchObject({ ok: true, titles: [] });
+    expect(await titlesOf(search.id)).toEqual([]);
   });
 
   it("adds each title's next page to what it found", async () => {
@@ -235,6 +249,8 @@ describe("a search of several titles", () => {
     expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id } })).toEqual(original);
     const kept = await prisma().postingSearch.findUniqueOrThrow({ where: { id: narrowed } });
     expect(kept).toMatchObject({ source: "JSEARCH", query: { ...query, keywords: "researcher, writer" }, found: 1, next: null });
+    expect(kept.createdAt.getTime()).toBe(original.createdAt.getTime() + 1);
+    expect((await listSearches())[0].searches.map((search) => search.id)).toEqual([narrowed, id]);
     expect((kept.postings as { title: string }[]).map((posting) => posting.title)).toEqual(["UX Researcher"]);
     expect(await titlesOf(narrowed)).toEqual([
       ["researcher", 1, false, null],
@@ -243,7 +259,8 @@ describe("a search of several titles", () => {
 
     // With one title left, it's a search of one.
     const one = (await dropSearchTitle(narrowed, "writer"))!;
-    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: one } })).toMatchObject({ query: { keywords: "researcher" }, titles: [], found: 1 });
+    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: one } })).toMatchObject({ query: { keywords: "researcher" }, found: 1 });
+    expect(await titlesOf(one)).toEqual([["researcher", 1, false, null]]);
     expect(await dropSearchTitle(one, "researcher")).toBeNull();
     expect(await dropSearchTitle("gone", "designer")).toBeNull();
     expect(await countSearches()).toBe(3);

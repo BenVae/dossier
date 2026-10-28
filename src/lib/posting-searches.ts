@@ -88,11 +88,13 @@ export async function showMoreFor(id: string): Promise<{ ok: true; postings: Sho
   const seen = new Set(before.map(postingKey));
   const added = answer.postings.filter((posting) => !seen.has(postingKey(posting)));
   const postings = [...before, ...added];
-  const titles = kept.map((title) => {
-    const page = answer.titles?.find((entry) => entry.title === title.title);
-    if (!page || !title.more) return title;
-    return { ...page, keys: [...new Set([...title.keys, ...page.keys])], total: page.total ?? title.total };
-  });
+  const titles = answer.titles
+    ? kept.map((title) => {
+        const page = answer.titles?.find((entry) => entry.title === title.title);
+        if (!page || !title.more) return title;
+        return { ...page, keys: [...new Set([...title.keys, ...page.keys])], total: page.total ?? title.total };
+      })
+    : [];
   await prisma.postingSearch.update({ where: { id }, data: { postings, found: postings.length, next: answer.next, titles } });
   return { ok: true, postings: await withStates(added), next: answer.next, titles };
 }
@@ -114,7 +116,15 @@ export async function dropSearchTitle(id: string, title: string): Promise<string
   const postings = postingsOf(search.postings).filter((posting) => !dropped.has(postingKey(posting)));
   const query = { ...queryOf(search.query), keywords: left.map((entry) => entry.title).join(", ") };
   const narrowed = await prisma.postingSearch.create({
-    data: { source: search.source, query, postings, found: postings.length, next: nextWithoutTitle(search.next, index), titles: left.length > 1 ? left : [] },
+    data: {
+      source: search.source,
+      query,
+      postings,
+      found: postings.length,
+      next: nextWithoutTitle(search.next, index),
+      titles: left,
+      createdAt: new Date(search.createdAt.getTime() + 1),
+    },
     select: { id: true },
   });
   return narrowed.id;

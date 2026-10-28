@@ -326,6 +326,14 @@ describe("the results", () => {
     expect(screen.queryByRole("list", { name: "Titles in this search" })).not.toBeInTheDocument();
   });
 
+  it("still says why the one title left found nothing, without a ×", () => {
+    renderScreen({ search: stored([], null, [{ title: "nurse", keys: [], total: null, more: false, problem: "limited" }]) });
+    expect(within(screen.getByRole("list", { name: "Titles in this search" })).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "nurseJSearch limited the search. Search again to retry",
+    ]);
+    expect(screen.queryByRole("button", { name: "Remove “nurse” from this search" })).not.toBeInTheDocument();
+  });
+
   it("says when the next page didn't come", async () => {
     vi.mocked(showMorePostings).mockResolvedValue({ ok: true, data: { ok: false, problem: "quota", message: "No searches left." } });
     renderScreen({ search: stored([posting("a")], "cursor:2") });
