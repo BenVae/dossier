@@ -309,7 +309,7 @@ const postingSearch = z.object({
   source: z.enum(PostingSource),
   query: z.unknown(),
   postings: z.unknown(),
-  titles: z.unknown(),
+  titles: z.unknown().default([]),
   found: int,
   next: text.nullable(),
   createdAt: date,

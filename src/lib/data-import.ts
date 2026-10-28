@@ -193,7 +193,7 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
           ...search,
           query: (search.query ?? {}) as Prisma.InputJsonValue,
           postings: (search.postings ?? []) as Prisma.InputJsonValue,
-          titles: (search.titles ?? []) as Prisma.InputJsonValue,
+          titles: search.titles as Prisma.InputJsonValue,
         })),
       });
       // The job agent's candidates (E16), so what it saw stays seen; a draft that isn't in the file leaves it unlinked.

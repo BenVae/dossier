@@ -170,7 +170,9 @@ describe("importExport (E10-6)", () => {
 
     // A file from before titles were kept.
     await prisma().postingSearch.deleteMany();
-    await importExport(prisma(), { ...file, searches: file.searches.map((search) => ({ ...search, titles: undefined })) });
+    const older = parseExport(JSON.stringify({ ...file, searches: file.searches.map((search) => ({ ...search, titles: undefined })) }));
+    if (!older.ok) throw new Error(older.error);
+    await importExport(prisma(), older.data);
     expect((await prisma().postingSearch.findFirstOrThrow()).titles).toEqual([]);
   });
 
