@@ -71,7 +71,7 @@ export function Sidebar({
 
       {update && (
         <div className="px-2 pb-2 group-data-collapsed/sidebar:px-1">
-          <UpdateNotice release={update} currentVersion={currentVersion} />
+          <UpdateNotice release={update} />
         </div>
       )}
 

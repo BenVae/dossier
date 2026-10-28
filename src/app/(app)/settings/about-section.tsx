@@ -7,9 +7,10 @@ import { toast } from "@/components/toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Toggle } from "@/components/ui/toggle";
-import { UPGRADE_GUIDE_URL, type Release } from "@/lib/releases";
+import { UPDATES_NAME, UPDATES_REPOSITORY, type Release } from "@/lib/releases";
 
 import { chooseUsagePing } from "../actions";
+import { UpdateCommand } from "../update-notice";
 import { USAGE_PING_PRIVACY_URL } from "../usage-ping-dialog";
 import { checkUpdates, updateSettings } from "./actions";
 import { SettingsSectionIntro } from "./settings-screen";
@@ -20,7 +21,7 @@ export type AboutFacts = { label: string; value: string }[];
 export type UpdatesView = {
   /** "Check for updates daily". */
   daily: boolean;
-  /** A newer release than this one, if a check has found one. */
+  /** A newer commit than this install's, if a check has found one. */
   available: Release | null;
 };
 
@@ -37,7 +38,13 @@ export type UsagePingView = {
   production: boolean;
 };
 
-type Check = { status: "idle" } | { status: "checking" } | { status: "latest" } | ({ status: "newer" } & Release) | { status: "unknown" };
+type Check =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "latest" }
+  | ({ status: "newer" } & Release)
+  | { status: "unknown" }
+  | { status: "untracked" };
 
 const LINK = "font-medium text-ink underline underline-offset-2";
 
@@ -119,7 +126,7 @@ export function AboutSection({ facts, usagePing, updates }: { facts: AboutFacts;
           label="Check for updates daily"
           description={
             daily
-              ? "Once on each day Dossier is used, the server asks GitHub for the latest release, and the sidebar says when a newer one is out."
+              ? `Once on each day Dossier is used, the server asks GitHub for the latest commit on ${UPDATES_REPOSITORY}'s main branch, and the sidebar says when it's newer than this install.`
               : "Off. Dossier only checks when you press Check for updates."
           }
           checked={daily}
@@ -133,23 +140,24 @@ export function AboutSection({ facts, usagePing, updates }: { facts: AboutFacts;
         <p role="status" className="text-control text-muted">
           {check.status === "latest" && "You're on the latest version."}
           {check.status === "unknown" && "Couldn't check for updates right now."}
+          {check.status === "untracked" && "This install doesn't know which commit it was built from, so it can't tell whether there's a newer one. Installs made with the setup script do."}
           {check.status === "newer" && (
             <>
-              Version {check.version} is available.{" "}
+              A newer version of {UPDATES_NAME} is available.{" "}
               <a href={check.url} target="_blank" rel="noopener noreferrer" className={LINK}>
                 See what&apos;s new{" "}
                 <span className="sr-only">(opens in a new tab)</span>
               </a>
-              {" · "}
-              <a href={UPGRADE_GUIDE_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
-                How to update{" "}
-                <span className="sr-only">(opens in a new tab)</span>
-              </a>
+              {" · "}To update, run the setup command again in PowerShell:
+              <UpdateCommand />
             </>
           )}
         </p>
       </div>
-      <p className="text-meta text-muted">Checking asks GitHub for the latest release and sends nothing about you or this install, daily or when you press it.</p>
+      <p className="text-meta text-muted">
+        Checking asks GitHub for the latest commit on {UPDATES_REPOSITORY}&apos;s main branch and sends nothing about you or this install, daily or when you
+        press it.
+      </p>
       <p className="text-meta text-muted">
         The usage ping only goes once you agree. It tells the Dossier project&apos;s maintainer, on the project&apos;s own server, how many installs are in use and how often. The ID is random and says nothing about you, and what&apos;s kept is deleted after a year. To have the rows already kept for this install removed sooner, note its ID, switch the ping off, and send the ID to{" "}
         <a href="mailto:dossier.app@pm.me" className={LINK}>

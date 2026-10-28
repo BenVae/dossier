@@ -148,7 +148,7 @@ const schema = z.object({
   DOSSIER_USAGE_PING_TEST_URL: optional(
     z.url({ protocol: /^https?$/, error: "DOSSIER_USAGE_PING_TEST_URL must be an http:// or https:// URL." }),
   ),
-  // For the end-to-end tests only: asks <url> for the latest release instead
+  // For the end-to-end tests only: asks <url> for the latest commit instead
   // of GitHub's API (e2e/fake-jobs.mts answers).
   DOSSIER_UPDATES_TEST_BASE_URL: optional(
     z.url({ protocol: /^https?$/, error: "DOSSIER_UPDATES_TEST_BASE_URL must be an http:// or https:// URL." }),

@@ -9,7 +9,7 @@ import {
   checkIfNewDay,
   dailyCheckRuns,
   isNewer,
-  latestRelease,
+  latestCommit,
   updateNotice,
   updateStatus,
 } from "./update-check";
@@ -21,12 +21,17 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: db.client };
 });
 vi.mock("@/lib/env", () => ({ env: {} }));
+// This install was built from commit aaa…, as the setup script's image records.
+vi.mock("@/lib/version", async (original) => ({ ...(await original<typeof import("@/lib/version")>()), appCommit: "a".repeat(40) }));
 
 const prisma = () => db.client!;
-const page = (version: string) => `https://github.com/AienTech/dossier/releases/tag/v${version}`;
-/** A fetch that answers like GitHub's latest release. */
-const answer = (status: number, body: unknown) => vi.fn<typeof fetch>(async () => Response.json(body, { status }));
-const releaseOf = (version: string) => answer(200, { tag_name: `v${version}`, html_url: page(version) });
+const built = "a".repeat(40);
+const newer = "b".repeat(40);
+const newest = "c".repeat(40);
+const changes = (from: string, to: string) => `https://github.com/BenVae/dossier/compare/${from}...${to}`;
+/** A fetch that answers like GitHub asked for a commit's SHA. */
+const answer = (status: number, body: string) => vi.fn<typeof fetch>(async () => new Response(body, { status }));
+const commitOf = (sha: string) => answer(200, sha);
 const morning = new Date("2026-10-18T08:00:00Z");
 const evening = new Date("2026-10-18T21:00:00Z");
 const nextDay = new Date("2026-10-19T00:30:00Z");
@@ -50,67 +55,86 @@ describe("isNewer", () => {
   });
 });
 
-describe("latestRelease (E10-9)", () => {
-  it("asks GitHub for the latest release and nothing else", async () => {
-    const fetch = releaseOf("0.2.0");
-    expect(await latestRelease(fetch)).toEqual({ version: "0.2.0", url: page("0.2.0") });
-    expect(fetch).toHaveBeenCalledWith("https://api.github.com/repos/AienTech/dossier/releases/latest", expect.objectContaining({ cache: "no-store" }));
+describe("latestCommit (E10-9)", () => {
+  it("asks GitHub for the latest commit on the fork's main branch and nothing else", async () => {
+    const fetch = commitOf(newer);
+    expect(await latestCommit(fetch)).toBe(newer);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.github.com/repos/BenVae/dossier/commits/main",
+      expect.objectContaining({ cache: "no-store", headers: expect.objectContaining({ accept: "application/vnd.github.sha" }) }),
+    );
     const [, init] = fetch.mock.calls[0];
     expect(init?.method ?? "GET").toBe("GET");
     expect(init?.body).toBeUndefined();
   });
 
   it("asks the fake for the end-to-end tests instead, when set", async () => {
-    const fetch = releaseOf("0.2.0");
-    await latestRelease(fetch, "http://localhost:3998/github");
-    expect(fetch.mock.calls[0][0]).toBe("http://localhost:3998/github/repos/AienTech/dossier/releases/latest");
+    const fetch = commitOf(newer);
+    await latestCommit(fetch, "http://localhost:3998/github");
+    expect(fetch.mock.calls[0][0]).toBe("http://localhost:3998/github/repos/BenVae/dossier/commits/main");
   });
 
-  it("can't tell offline, without a release, or from an answer that isn't one", async () => {
-    expect(await latestRelease(answer(404, { message: "Not Found" }))).toBeNull();
-    expect(await latestRelease(vi.fn(async () => Promise.reject(new TypeError("fetch failed"))))).toBeNull();
-    expect(await latestRelease(answer(200, { tag_name: "v0.2.0" }))).toBeNull();
-    expect(await latestRelease(answer(200, { tag_name: "v0.2.0", html_url: "https://example.com/v0.2.0" }))).toBeNull();
+  it("can't tell offline, without the branch, or from an answer that isn't a commit", async () => {
+    expect(await latestCommit(answer(404, '{"message":"Not Found"}'))).toBeNull();
+    expect(await latestCommit(vi.fn(async () => Promise.reject(new TypeError("fetch failed"))))).toBeNull();
+    expect(await latestCommit(answer(200, '{"sha":"' + newer + '"}'))).toBeNull();
+    expect(await latestCommit(answer(200, "bbbbbbb"))).toBeNull();
   });
 });
 
 describe("updateStatus", () => {
-  it("says whether a release is newer than this version", () => {
-    expect(updateStatus({ version: "0.2.0", url: page("0.2.0") }, "0.1.0")).toEqual({ status: "newer", version: "0.2.0", url: page("0.2.0") });
-    expect(updateStatus({ version: "0.1.0", url: page("0.1.0") }, "0.1.0")).toEqual({ status: "latest", version: "0.1.0" });
-    expect(updateStatus(null, "0.1.0")).toEqual({ status: "unknown" });
+  it("says whether main has moved on from the commit this install was built from", () => {
+    expect(updateStatus(newer, built)).toEqual({ status: "newer", version: newer, url: changes(built, newer) });
+    expect(updateStatus(built, built)).toEqual({ status: "latest", version: built });
+    expect(updateStatus(null, built)).toEqual({ status: "unknown" });
+  });
+
+  it("can't tell without knowing this install's commit", () => {
+    expect(updateStatus(newer, null)).toEqual({ status: "untracked" });
   });
 });
 
 describe("the sidebar's notice", () => {
-  const seen = { latestVersion: "0.2.0", latestVersionUrl: page("0.2.0") };
+  const seen = { latestVersion: newer, latestVersionUrl: changes(built, newer) };
 
-  it("shows a newer release than this one", () => {
-    expect(availableUpdate(seen, "0.1.0")).toEqual({ version: "0.2.0", url: page("0.2.0") });
-    expect(updateNotice({ ...seen, updateDismissed: null }, "0.1.0")).toEqual({ version: "0.2.0", url: page("0.2.0") });
-    expect(updateNotice({ ...seen, updateDismissed: null }, "0.2.0")).toBeNull();
-    expect(updateNotice({ latestVersion: null, latestVersionUrl: null, updateDismissed: null }, "0.1.0")).toBeNull();
+  it("shows a newer commit than this install's", () => {
+    expect(availableUpdate(seen, built)).toEqual({ version: newer, url: changes(built, newer) });
+    expect(updateNotice({ ...seen, updateDismissed: null }, built)).toEqual({ version: newer, url: changes(built, newer) });
+    expect(updateNotice({ ...seen, updateDismissed: null }, newer)).toBeNull();
+    expect(updateNotice({ latestVersion: null, latestVersionUrl: null, updateDismissed: null }, built)).toBeNull();
   });
 
-  it("stays hidden after Not now, until a newer release still", () => {
-    expect(updateNotice({ ...seen, updateDismissed: "0.2.0" }, "0.1.0")).toBeNull();
-    expect(updateNotice({ latestVersion: "0.3.0", latestVersionUrl: page("0.3.0"), updateDismissed: "0.2.0" }, "0.1.0")).toEqual({
-      version: "0.3.0",
-      url: page("0.3.0"),
+  it("waits for the next check after an update, and never shows without this install's commit", () => {
+    expect(availableUpdate(seen, newest)).toBeNull();
+    expect(availableUpdate(seen, null)).toBeNull();
+  });
+
+  it("stays hidden after Not now, until main moves on again", () => {
+    expect(updateNotice({ ...seen, updateDismissed: newer }, built)).toBeNull();
+    expect(updateNotice({ latestVersion: newest, latestVersionUrl: changes(built, newest), updateDismissed: newer }, built)).toEqual({
+      version: newest,
+      url: changes(built, newest),
     });
   });
 
   it("never links a page off GitHub, whatever is stored", () => {
-    expect(availableUpdate({ latestVersion: "0.2.0", latestVersionUrl: "https://example.com/" }, "0.1.0")).toBeNull();
+    expect(availableUpdate({ latestVersion: newer, latestVersionUrl: "https://example.com/" }, built)).toBeNull();
   });
 });
 
 describe("checkForUpdate", () => {
-  it("keeps the latest release it finds, and what it had when it can't tell", async () => {
-    expect(await checkForUpdate(releaseOf("0.2.0"), "0.1.0")).toEqual({ status: "newer", version: "0.2.0", url: page("0.2.0") });
-    expect(await loadSettings()).toMatchObject({ latestVersion: "0.2.0", latestVersionUrl: page("0.2.0") });
-    expect(await checkForUpdate(answer(503, {}), "0.1.0")).toEqual({ status: "unknown" });
-    expect(await loadSettings()).toMatchObject({ latestVersion: "0.2.0" });
+  it("keeps the latest commit it finds, and what it had when it can't tell", async () => {
+    expect(await checkForUpdate(commitOf(newer), built)).toEqual({ status: "newer", version: newer, url: changes(built, newer) });
+    expect(await loadSettings()).toMatchObject({ latestVersion: newer, latestVersionUrl: changes(built, newer) });
+    expect(await checkForUpdate(answer(503, ""), built)).toEqual({ status: "unknown" });
+    expect(await loadSettings()).toMatchObject({ latestVersion: newer });
+  });
+
+  it("asks nothing when this install doesn't know its own commit", async () => {
+    const fetch = commitOf(newer);
+    expect(await checkForUpdate(fetch, null)).toEqual({ status: "untracked" });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await loadSettings()).toMatchObject({ latestVersion: null });
   });
 });
 
@@ -123,18 +147,18 @@ describe("the daily check", () => {
   });
 
   it("asks once a day, even across restarts", async () => {
-    const fetch = releaseOf("0.2.0");
+    const fetch = commitOf(newer);
     expect(await checkIfNewDay({ now: morning, runs: true, fetchImpl: fetch })).toBe("checked");
     expect(await checkIfNewDay({ now: evening, runs: true, fetchImpl: fetch })).toBe("skipped");
     restart();
     expect(await checkIfNewDay({ now: evening, runs: true, fetchImpl: fetch })).toBe("skipped");
     expect(await checkIfNewDay({ now: nextDay, runs: true, fetchImpl: fetch })).toBe("checked");
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(await loadSettings()).toMatchObject({ updateCheckDay: "2026-10-19", latestVersion: "0.2.0" });
+    expect(await loadSettings()).toMatchObject({ updateCheckDay: "2026-10-19", latestVersion: newer });
   });
 
   it("doesn't ask while it's switched off, or outside production", async () => {
-    const fetch = releaseOf("0.2.0");
+    const fetch = commitOf(newer);
     await saveSettings({ updateCheck: false });
     expect(await checkIfNewDay({ now: morning, runs: true, fetchImpl: fetch })).toBe("skipped");
     restart();

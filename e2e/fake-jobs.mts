@@ -55,9 +55,9 @@ createServer((request, response) => {
     });
     return;
   }
-  // The update check (DOSSIER_UPDATES_TEST_BASE_URL): no release is out, so
-  // what a test stores as the latest release stays as it is.
-  if (url.pathname === "/github/repos/AienTech/dossier/releases/latest") return send(response, 404, { message: "Not Found" });
+  // The update check (DOSSIER_UPDATES_TEST_BASE_URL): it can't tell, so what
+  // a test stores as the latest commit stays as it is.
+  if (url.pathname === "/github/repos/BenVae/dossier/commits/main") return send(response, 404, { message: "Not Found" });
 
   if (url.pathname === "/jsearch/search-v2") {
     if (request.headers["x-api-key"] !== JSEARCH_KEY) return send(response, 401, { status: "ERROR", error: { message: "Invalid API key" } });
