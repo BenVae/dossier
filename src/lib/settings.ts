@@ -178,8 +178,8 @@ export const settingsSchema = z.object({
   startupsLastRefresh: json(startupsRefreshSchema).nullable().catch(null),
   /** "Check for updates daily" in Settings → About (update-check.ts). */
   updateCheck: flag(true),
-  // The newest release the update check has seen, the UTC day it last
-  // asked, and the release "Not now" hid the sidebar notice for. They belong
+  // The latest commit the update check has seen, the UTC day it last
+  // asked, and the commit "Not now" hid the sidebar notice for. They belong
   // to the install, not its data, so exports leave them out (INSTALL_SETTINGS).
   latestVersion: z.string().nullable().catch(null),
   latestVersionUrl: z.string().nullable().catch(null),

@@ -4,7 +4,9 @@ import { CircleArrowUp } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { toast } from "@/components/toast";
-import { UPGRADE_GUIDE_URL, type Release } from "@/lib/releases";
+import { Button } from "@/components/ui/button";
+import { copyText } from "@/lib/copy-text";
+import { UPDATE_COMMAND, UPDATES_NAME, type Release } from "@/lib/releases";
 import { dismissUpdate } from "@/lib/update-actions";
 
 import { useExpandSidebar, useSidebarCollapsed } from "./sidebar-frame";
@@ -12,6 +14,22 @@ import { useExpandSidebar, useSidebarCollapsed } from "./sidebar-frame";
 // Each at least 24 px high (WCAG 2.2 target size), however small the text.
 const TARGET = "inline-flex min-h-6 items-center";
 const LINK = `${TARGET} font-medium text-ink underline underline-offset-2`;
+const TITLE = `A newer version of ${UPDATES_NAME} is out`;
+
+/** The setup command, which updates this install, and a button that copies it. */
+export function UpdateCommand() {
+  const copy = async () => toast((await copyText(UPDATE_COMMAND)) ? "Copied the setup command." : "That didn't copy. Select it and copy it yourself.");
+  return (
+    <span className="flex items-start gap-2">
+      <code className="min-w-0 rounded-control border border-line-field bg-input px-2 py-1 font-mono text-xs select-all [overflow-wrap:anywhere]">
+        {UPDATE_COMMAND}
+      </code>
+      <Button variant="text" size="sm" onClick={() => void copy()}>
+        Copy
+      </Button>
+    </span>
+  );
+}
 
 /** The first link or button after `element` in the sidebar, in document order. */
 function nextControl(element: HTMLElement | null): HTMLElement | null {
@@ -21,12 +39,12 @@ function nextControl(element: HTMLElement | null): HTMLElement | null {
 }
 
 /**
- * The sidebar's notice while a newer release is out: what's new in it, how
+ * The sidebar's notice while main has a newer commit: what's new in it, how
  * to update, or "Not now", which hides it until a newer one still. While the
  * sidebar is collapsed it's an icon with a dot, which opens the sidebar to
  * show the notice.
  */
-export function UpdateNotice({ release, currentVersion }: { release: Release; currentVersion: string }) {
+export function UpdateNotice({ release }: { release: Release }) {
   const [hidden, setHidden] = useState(false);
   const notice = useRef<HTMLElement>(null);
   const titleId = useId();
@@ -44,7 +62,7 @@ export function UpdateNotice({ release, currentVersion }: { release: Release; cu
   if (hidden) return null;
 
   if (collapsed) {
-    const label = `Dossier ${release.version} is out`;
+    const label = TITLE;
     return (
       <button
         type="button"
@@ -76,16 +94,13 @@ export function UpdateNotice({ release, currentVersion }: { release: Release; cu
   return (
     <section ref={notice} aria-labelledby={titleId} className="flex flex-col gap-1.5 rounded-control border border-line-card bg-card px-3 py-2.5">
       <h2 id={titleId} className="text-meta font-medium">
-        Dossier {release.version} is out
+        {TITLE}
       </h2>
-      <p className="text-xs text-muted">You have {currentVersion}. Update to get its fixes and features.</p>
+      <p className="text-xs text-muted">To update, run the setup command again in PowerShell. It keeps your data and password.</p>
+      <UpdateCommand />
       <div className="flex flex-wrap gap-x-3 text-xs">
         <a href={release.url} target="_blank" rel="noopener noreferrer" className={LINK}>
           What&apos;s new{" "}
-          <span className="sr-only">(opens in a new tab)</span>
-        </a>
-        <a href={UPGRADE_GUIDE_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
-          How to update{" "}
           <span className="sr-only">(opens in a new tab)</span>
         </a>
         <button type="button" onClick={() => void notNow()} className={`${TARGET} text-muted hover:text-ink`}>

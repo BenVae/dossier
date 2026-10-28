@@ -20,8 +20,13 @@ function Install-Dossier {
     return
   }
 
+  # Built from the commit the branch is at now, which Dossier keeps to tell when the branch has moved on
+  # (its update check). If GitHub doesn't say which, it's built from the branch and the check can't tell.
+  $commit = try { (Invoke-RestMethod "https://api.github.com/repos/$repo/commits/$branch").sha } catch { "" }
+  $ref = if ($commit) { $commit } else { $branch }
+
   Write-Host "`n1/4 Building Dossier from github.com/$repo (takes a few minutes the first time)..." -ForegroundColor Cyan
-  docker build --target production -t $image "https://github.com/$repo.git#$branch"
+  docker build --target production --build-arg "DOSSIER_COMMIT=$commit" -t $image "https://github.com/$repo.git#$ref"
   if ($LASTEXITCODE -ne 0) { Write-Host "The build failed; see the messages above." -ForegroundColor Red; return }
 
   Write-Host "`n2/4 Setting up $dir ..." -ForegroundColor Cyan

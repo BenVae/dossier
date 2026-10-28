@@ -275,7 +275,7 @@ export const deleteEverything = action(z.object({ confirm: z.literal("DELETE") }
   redirect("/");
 });
 
-/** "Check for updates" (E10-9): the latest release, asked for now, and kept for the sidebar's notice. */
+/** "Check for updates" (E10-9): the latest commit, asked for now, and kept for the sidebar's notice. */
 export const checkUpdates = action(z.object({}), async () => {
   const result = await checkForUpdate();
   revalidatePath("/", "layout");
