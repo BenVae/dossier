@@ -77,6 +77,21 @@ export const SOURCE_INFO: Record<JobSource, SourceInfo> = {
   },
 };
 
+/** "LinkedIn via JSearch"; just the source's name for its own postings. */
+export function sourceName({ source, via }: { source: JobSource; via: string }): string {
+  return via ? `${via} via ${SOURCE_INFO[source].name}` : SOURCE_INFO[source].name;
+}
+
+type Origin = { source: JobSource; via: string; url: string };
+
+/** An application's link and source, from the Find jobs posting or agent candidate it was made from; its own link wins. */
+export function postingOrigin(application: { postingUrl: string; posting: Origin | null; agentCandidate: Origin | null }): { url: string; source: string } {
+  const from = application.posting ?? application.agentCandidate;
+  // Only web links: an imported file could carry any URL (E11-5).
+  const url = [application.postingUrl, from?.url ?? ""].find((link) => /^https?:\/\//i.test(link)) ?? "";
+  return { url, source: from ? sourceName(from) : "" };
+}
+
 /** Whether a source lists jobs in a country ("de"). */
 export function sourceCovers(source: JobSource, country: string): boolean {
   const countries = SOURCE_INFO[source].countries;

@@ -29,6 +29,8 @@ export const loadApplication = cache(async (id: string) => {
       notes: true,
       events: { select: { id: true, to: true, at: true } },
       facts: { select: { id: true, text: true }, orderBy: [{ sort: "asc" }, { createdAt: "asc" }] },
+      posting: { select: { source: true, via: true, url: true } },
+      agentCandidate: { select: { source: true, via: true, url: true } },
     },
   });
   if (!application) notFound();

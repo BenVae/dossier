@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 import { fitBand, type PostingFit } from "@/lib/fit";
 import type { JobView } from "@/lib/jobs/runner";
 import { postedAgo, postingKey, type FoundPosting, type PostingState, type ShownPosting, type StoredSearch } from "@/lib/job-search/search";
-import { arbeitsagenturPage, SOURCE_INFO } from "@/lib/job-search/sources";
+import { arbeitsagenturPage, SOURCE_INFO, sourceName } from "@/lib/job-search/sources";
 
 import { dismissFoundPosting, loadFullText, restorePosting, savePostingForLater, showMorePostings, startScoringPosting, unsavePosting } from "./actions";
 import { useStartApplication } from "./use-start-application";
@@ -275,6 +275,7 @@ function withoutState(posting: ShownPosting): FoundPosting {
 
 /** The Score pill on an unscored posting in the list, and the room the card keeps for it. */
 const pill = "inline-flex h-6 items-center rounded-full border px-2 text-xs";
+const openLink = "inline-flex h-6 items-center text-xs text-muted underline underline-offset-2";
 
 function PostingList({
   postings,
@@ -340,9 +341,12 @@ function PostingList({
               <span className="text-meta text-muted">{[posting.company, posting.place, posting.remote ? "Remote" : ""].filter(Boolean).join(" · ")}</span>
               <span className="flex items-center justify-between gap-3">
                 <span className="min-w-0 truncate text-xs text-muted">
-                  {[postedAgo(posting.postedAt, now), posting.via && `via ${posting.via}`, posting.salary].filter(Boolean).join(" · ")}
+                  {[postedAgo(posting.postedAt, now), sourceName(posting), posting.salary].filter(Boolean).join(" · ")}
                 </span>
-                <SourceAttribution source={posting.source} url={posting.url} placeholder />
+                <span aria-hidden className="invisible flex shrink-0 items-center gap-2">
+                  {posting.url && <span className={openLink}>Open posting↗</span>}
+                  <SourceAttribution source={posting.source} url={posting.url} placeholder />
+                </span>
               </span>
             </button>
             {/* A button can't hold another, so the pill lies over the room the card keeps for it, with the card's border and padding. */}
@@ -362,10 +366,18 @@ function PostingList({
                 </button>
               </span>
             )}
-            {/* Adzuna's label is a link, so it lies over room the card keeps too (E14-2). */}
-            {linksAttribution(posting.source) && (
+            {/* The posting's link and Adzuna's label (E14-2) lie over room the card keeps too. */}
+            {(posting.url || linksAttribution(posting.source)) && (
               <span className="pointer-events-none absolute inset-0 flex items-end justify-end border border-transparent px-4 py-3.5">
-                <SourceAttribution source={posting.source} url={posting.url} className="pointer-events-auto" />
+                <span className="flex items-center gap-2">
+                  {posting.url && (
+                    <a href={posting.url} target="_blank" rel="noopener noreferrer" className={cn(openLink, "pointer-events-auto hover:text-ink")}>
+                      Open posting<span aria-hidden>↗</span>
+                      <span className="sr-only"> “{title}” (opens in a new tab)</span>
+                    </a>
+                  )}
+                  {linksAttribution(posting.source) && <SourceAttribution source={posting.source} url={posting.url} className="pointer-events-auto" />}
+                </span>
               </span>
             )}
           </li>
@@ -482,9 +494,7 @@ function PostingDetail({
           {posting.title || "Untitled posting"}
         </h2>
         <p className="text-sm text-muted">{[posting.company, posting.place, posting.remote ? "Remote" : "", posting.salary].filter(Boolean).join(" · ")}</p>
-        {(ago || posting.via) && (
-          <p className="text-meta text-muted">{[ago && `Posted ${ago === "Today" || ago === "Yesterday" ? ago.toLowerCase() : ago}`, posting.via && `via ${posting.via}`].filter(Boolean).join(" · ")}</p>
-        )}
+        <p className="text-meta text-muted">{[ago && `Posted ${ago === "Today" || ago === "Yesterday" ? ago.toLowerCase() : ago}`, sourceName(posting)].filter(Boolean).join(" · ")}</p>
       </div>
 
       {state.applicationId && (
