@@ -87,6 +87,8 @@ test("keeps what several titles found when one is limited, and takes that one ou
   await form.getByRole("button", { name: "Search" }).click();
   const titles = page.getByRole("list", { name: "Titles in this search" });
   await expect(titles.getByRole("listitem")).toHaveText(["UX Designer3 found, more to come×", "limitedJSearch limited the search. Search again to retry×"]);
+  // The long problem doesn't squeeze the title out of sight at desktop width.
+  expect(await titles.getByText("limited", { exact: true }).evaluate((title) => title.scrollWidth <= title.clientWidth)).toBe(true);
   await expect(page.getByRole("list", { name: "Postings" }).getByRole("listitem")).toHaveCount(3);
 
   await page.getByRole("button", { name: "Remove “limited” from this search" }).click();

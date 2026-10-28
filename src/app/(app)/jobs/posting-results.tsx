@@ -302,7 +302,7 @@ function TitleCounts({
     <ul aria-label="Titles in this search" className="flex flex-col rounded-card border border-line-card bg-card px-4 py-1 text-meta">
       {titles.map((title) => (
         <li key={title.title} className="flex items-center gap-3 border-b border-line py-1.5 last:border-b-0">
-          <span className="min-w-0 flex-1 truncate font-medium text-ink">{title.title}</span>
+          <span className="min-w-[40%] flex-1 truncate font-medium text-ink">{title.title}</span>
           <span className={cn("text-right", title.problem ? "text-warning" : title.keys.length === 0 ? "text-faint" : "text-muted")}>
             {titleStatus(title, source)}
           </span>
