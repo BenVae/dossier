@@ -7,10 +7,10 @@ import { isAiConfigured, isAiUsable } from "@/lib/ai/config";
 import { handOffFoundPosting, handsOffToClaude } from "@/lib/connector/handoff";
 import { loadJobSearchConfig } from "@/lib/job-search/config";
 import { fullText } from "@/lib/job-search/find";
-import { foundPostingSchema, JOB_SOURCES, searchQuerySchema } from "@/lib/job-search/search";
+import { foundPostingSchema, JOB_SOURCES, MAX_KEYWORDS, searchQuerySchema } from "@/lib/job-search/search";
 import { findUnfinishedJobs, startJob } from "@/lib/jobs/runner";
 import { scoreJobKey, scorePostingJob } from "@/lib/jobs/score-posting";
-import { removeSearch, runSearch, showMoreFor } from "@/lib/posting-searches";
+import { dropSearchTitle, removeSearch, runSearch, showMoreFor } from "@/lib/posting-searches";
 import { dismissPosting, savePosting, storePosting, unmarkPosting } from "@/lib/postings";
 import { saveSettings } from "@/lib/settings-data";
 
@@ -34,6 +34,14 @@ export const runJobSearch = action(z.object({ query: searchQuerySchema }), ({ qu
 
 /** "Show more": the next page, added to the kept search. */
 export const showMorePostings = action(z.object({ searchId }), ({ searchId }) => showMoreFor(searchId));
+
+/** ✕ on a title of a search with several: the search without it, kept as a new one, without asking the source. */
+export const dropTitleFromSearch = action(z.object({ searchId, title: z.string().min(1).max(MAX_KEYWORDS) }), async ({ searchId, title }, { toast }) => {
+  const id = await dropSearchTitle(searchId, title);
+  if (!id) throw new ActionError("That search is no longer kept. Search again.");
+  toast(`Removed “${title}” from this search.`);
+  return { id };
+});
 
 /** Removes a kept search and what it found; saved postings stay. */
 export const removeJobSearch = action(z.object({ id: searchId }), async ({ id }, { toast }) => {

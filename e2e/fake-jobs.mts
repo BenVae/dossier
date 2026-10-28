@@ -112,6 +112,11 @@ createServer((request, response) => {
     searches += 1;
     // "nothing" finds nothing; otherwise two pages, joined by a cursor.
     if (/nothing/i.test(url.searchParams.get("query") ?? "")) return send(response, 200, { status: "OK", data: { jobs: [], cursor: null } });
+    // "limited" is refused as RapidAPI refuses requests over a plan's per-second limit, with searches left.
+    if (/limited/i.test(url.searchParams.get("query") ?? "")) {
+      response.writeHead(429, { "content-type": "application/json", "x-ratelimit-requests-remaining": "150" });
+      return void response.end(JSON.stringify({ message: "Too many requests" }));
+    }
     const second = url.searchParams.get("cursor") === "PAGE-2";
     return send(response, 200, { status: "OK", request_id: "e2e", data: second ? { jobs: secondPage, cursor: null } : { jobs: firstPage, cursor: "PAGE-2" } });
   }

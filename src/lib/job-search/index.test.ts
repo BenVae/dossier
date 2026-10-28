@@ -4,7 +4,7 @@ import { json, stubFetch } from "@/lib/ai/test-http";
 import { jsearchV2LastPage, jsearchV2Page } from "@/test/job-search-fixtures";
 
 import { clearJobSearchCache } from "./cache";
-import { postingDetails, searchPostings, testSource } from "./index";
+import { nextWithoutTitle, postingDetails, searchPostings, testSource } from "./index";
 import { EMPTY_QUERY } from "./search";
 import { sourceCovers } from "./sources";
 
@@ -54,6 +54,13 @@ describe("searchPostings", () => {
     expect((await searchPostings("ARBEITSAGENTUR", {}, { ...query, keywords: "designer, developer" }, "page:2")).postings).toMatchObject([{ title: "E" }]);
   });
 
+  it("takes a title's place out of the next pages; the one title left goes on with its own", () => {
+    expect(nextWithoutTitle('each:["page:2",null,"page:3"]', 1)).toBe('each:["page:2","page:3"]');
+    expect(nextWithoutTitle('each:["page:2","page:3"]', 0)).toBe("page:3");
+    expect(nextWithoutTitle('each:["page:2",null,null]', 0)).toBeNull();
+    expect(nextWithoutTitle("page:2", 0)).toBe("page:2");
+  });
+
   it("doesn't keep failures", async () => {
     let status = 503;
     const requests = stubFetch(() => json(jsearchV2LastPage, { status }));
@@ -74,6 +81,30 @@ describe("searchPostings", () => {
     stubFetch(() => json({}, { status: 401 }));
     await expect(searchPostings("JSEARCH", ninja, { ...query, keywords: "other" })).rejects.toMatchObject({ problem: "key" });
     expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops asking the other titles once the source refuses the key", async () => {
+    const requests = stubFetch(() => json({}, { status: 401 }));
+    await expect(searchPostings("JSEARCH", ninja, { ...query, keywords: "a, b, c, d, e" })).rejects.toMatchObject({ problem: "key" });
+    expect(requests).toHaveLength(3);
+  });
+
+  it("waits between requests only, not before titles it doesn't ask", async () => {
+    const requests = stubFetch(() => json(jsearchV2LastPage));
+    const started = Date.now();
+    await searchPostings("JSEARCH", ninja, { ...query, keywords: "a, b, c, d, e" }, 'each:["cursor:A","cursor:B","cursor:C",null,null]');
+    expect(requests).toHaveLength(3);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it("goes on asking the other titles when a source without a plan limits one", async () => {
+    const requests = stubFetch(({ url }) => {
+      const was = url.searchParams.get("was")!;
+      return was === "a" ? json({}, { status: 429 }) : json({ ergebnisliste: [{ stellenangebotsTitel: was, referenznummer: was, firma: "Acme", stellenlokationen: [] }], maxErgebnisse: 1 });
+    });
+    const page = await searchPostings("ARBEITSAGENTUR", {}, { ...query, keywords: "a, b, c, d" });
+    expect(requests).toHaveLength(4);
+    expect(page.titles?.map((title) => title.problem)).toEqual(["quota", null, null, null]);
   });
 
   it("says when a source doesn't cover the country, before asking it", async () => {

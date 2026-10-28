@@ -35,9 +35,26 @@ export const POSTED_WITHIN = [
 export type PostedWithin = (typeof POSTED_WITHIN)[number]["value"];
 const POSTED_VALUES = POSTED_WITHIN.map((option) => option.value) as [PostedWithin, ...PostedWithin[]];
 
+/**
+ * How long the keywords may be: a guard far above any real list of titles,
+ * which may be long (each title is its own search).
+ */
+export const MAX_KEYWORDS = 5000;
+export const KEYWORDS_TOO_LONG = "That's too long to search. Shorten the list.";
+
+/** Over this many titles, the form says what a search that size costs. */
+export const MANY_TITLES = 10;
+
+/** The titles in `keywords`, separated by commas. */
+export const splitTitles = (keywords: string) =>
+  keywords
+    .split(",")
+    .map((title) => title.trim())
+    .filter(Boolean);
+
 /** One search, as every source gets it. */
 export const searchQuerySchema = z.object({
-  keywords: z.string().trim().max(200),
+  keywords: z.string().trim().max(MAX_KEYWORDS, KEYWORDS_TOO_LONG),
   /** A city or region; empty searches the whole country. */
   place: z.string().trim().max(200),
   /** ISO 3166-1 alpha-2 in lower case, e.g. "de"; empty until one is chosen. */
@@ -88,8 +105,32 @@ export const foundPostingSchema = z.object({
 });
 export type FoundPosting = z.output<typeof foundPostingSchema>;
 
-/** A page of results, and what to ask for the next page (null on the last one). */
-export type SearchPage = { postings: FoundPosting[]; next: string | null };
+/** What went wrong with a search, in words for the screen (E14-6). */
+const SEARCH_PROBLEMS = ["off", "not-accepted", "no-country", "no-key", "key", "quota", "limited", "country", "unavailable", "changed"] as const;
+export type SearchProblem = { ok: false; problem: (typeof SEARCH_PROBLEMS)[number]; message: string };
+
+/**
+ * A page of results, and what to ask for the next page (null on the last
+ * one), with how many the source has in all when it says. A search of
+ * several titles also says how each one went.
+ */
+export type SearchPage = { postings: FoundPosting[]; next: string | null; total?: number | null; titles?: TitleOutcome[] };
+
+/** How each title of a search with several went: the postings it found so far, and what went wrong with its last page. */
+export const titleOutcomesSchema = z
+  .array(
+    z.object({
+      title: z.string(),
+      /** postingKey of each posting it found, some of which other titles found too. */
+      keys: z.array(z.string()),
+      /** How many the source has for it in all; null when the source doesn't say (JSearch). */
+      total: z.number().nullable(),
+      more: z.boolean(),
+      problem: z.enum(SEARCH_PROBLEMS).nullable(),
+    }),
+  )
+  .catch([]);
+export type TitleOutcome = z.output<typeof titleOutcomesSchema>[number];
 
 /** Where a posting stands for the user (E14-5). */
 export type PostingState = {
@@ -106,9 +147,6 @@ export type PostingState = {
 /** A posting as Find jobs shows it. */
 export type ShownPosting = FoundPosting & { state: PostingState };
 
-/** What went wrong with a search, in words for the screen (E14-6). */
-export type SearchProblem = { ok: false; problem: "off" | "not-accepted" | "no-country" | "no-key" | "key" | "quota" | "country" | "unavailable" | "changed"; message: string };
-
 /** What a search gives the screen: postings, or what went wrong. */
 export type SearchOutcome = { ok: true; postings: ShownPosting[]; next: string | null } | SearchProblem;
 
@@ -121,6 +159,8 @@ export type StoredSearch = {
   ranAt: string;
   postings: ShownPosting[];
   next: string | null;
+  /** How each title went, for a search of several (empty otherwise). */
+  titles: TitleOutcome[];
 };
 
 /** A search in the Past searches list, grouped by the day it ran. */
@@ -184,7 +224,7 @@ export function queryFromParams(params: Record<string, string | string[] | undef
   const posted = POSTED_VALUES.find((value) => value === one(params.posted));
   const country = one(params.country).trim().toLowerCase();
   return {
-    keywords: keywords.slice(0, 200),
+    keywords: keywords.slice(0, MAX_KEYWORDS),
     place: one(params.where).trim().slice(0, 200),
     country: /^[a-z]{2}$/.test(country) ? country : "",
     radiusKm: RADII_KM.find((km) => km === radius) ?? DEFAULT_RADIUS_KM,
@@ -237,7 +277,7 @@ export function latestRole(experience: readonly Role[]): string {
 
 /** The first search on Find jobs (E14-6): that role, in the profile's city and country. */
 export function defaultSearch({ role, city, country }: { role: string; city: string; country: string }): SearchQuery {
-  return { ...EMPTY_QUERY, keywords: role.trim().slice(0, 200), place: city.trim().slice(0, 200), country: countryCodeFor(country) };
+  return { ...EMPTY_QUERY, keywords: role.trim().slice(0, MAX_KEYWORDS), place: city.trim().slice(0, 200), country: countryCodeFor(country) };
 }
 
 /** "Today", "Yesterday", "3 days ago", "2 weeks ago", or the date for older postings; "" without a date. */

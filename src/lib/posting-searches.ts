@@ -2,18 +2,21 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
 import { daysBetween, formatDay, formatTime } from "@/lib/dates";
+import { nextWithoutTitle } from "@/lib/job-search";
 import { askSource } from "@/lib/job-search/find";
 import {
   EMPTY_QUERY,
   foundPostingSchema,
   postingKey,
   searchQuerySchema,
+  titleOutcomesSchema,
   type FoundPosting,
   type PastSearchDay,
   type SearchProblem,
   type SearchQuery,
   type ShownPosting,
   type StoredSearch,
+  type TitleOutcome,
 } from "@/lib/job-search/search";
 import { postingStates } from "@/lib/postings";
 import { prisma } from "@/lib/prisma";
@@ -50,7 +53,7 @@ export async function runSearch(query: SearchQuery): Promise<{ ok: true; id: str
   const answer = await askSource(query);
   if (!answer.ok) return answer;
   const search = await prisma.postingSearch.create({
-    data: { source: answer.source, query, postings: answer.postings, found: answer.postings.length, next: answer.next },
+    data: { source: answer.source, query, postings: answer.postings, found: answer.postings.length, next: answer.next, titles: answer.titles ?? [] },
     select: { id: true },
   });
   return { ok: true, id: search.id };
@@ -69,22 +72,62 @@ export async function loadSearch(id?: string, { timeZone, now = new Date() }: { 
     ranAt: ranAtLabel(search.createdAt, timeZone, now),
     postings: await withStates(postingsOf(search.postings)),
     next: search.next,
+    titles: titleOutcomesSchema.parse(search.titles),
   };
 }
 
-/** "Show more": the next page from the search's own source, added to the kept search. */
-export async function showMoreFor(id: string): Promise<{ ok: true; postings: ShownPosting[]; next: string | null } | SearchProblem> {
+/** "Show more": the next page from the search's own source, added to the kept search, with how each title went. */
+export async function showMoreFor(id: string): Promise<{ ok: true; postings: ShownPosting[]; next: string | null; titles: TitleOutcome[] } | SearchProblem> {
   const search = await prisma.postingSearch.findUnique({ where: { id } });
   if (!search) return { ok: false, problem: "changed", message: "That search is no longer kept. Search again." };
-  if (!search.next) return { ok: true, postings: [], next: null };
+  const kept = titleOutcomesSchema.parse(search.titles);
+  if (!search.next) return { ok: true, postings: [], next: null, titles: kept };
   const answer = await askSource(queryOf(search.query), { source: search.source, next: search.next });
   if (!answer.ok) return answer;
-  const kept = postingsOf(search.postings);
-  const seen = new Set(kept.map(postingKey));
+  const before = postingsOf(search.postings);
+  const seen = new Set(before.map(postingKey));
   const added = answer.postings.filter((posting) => !seen.has(postingKey(posting)));
-  const postings = [...kept, ...added];
-  await prisma.postingSearch.update({ where: { id }, data: { postings, found: postings.length, next: answer.next } });
-  return { ok: true, postings: await withStates(added), next: answer.next };
+  const postings = [...before, ...added];
+  const titles = answer.titles
+    ? kept.map((title) => {
+        const page = answer.titles?.find((entry) => entry.title === title.title);
+        if (!page || !title.more) return title;
+        return { ...page, keys: [...new Set([...title.keys, ...page.keys])], total: page.total ?? title.total };
+      })
+    : [];
+  await prisma.postingSearch.update({ where: { id }, data: { postings, found: postings.length, next: answer.next, titles } });
+  return { ok: true, postings: await withStates(added), next: answer.next, titles };
+}
+
+/**
+ * Keeps a kept search of several without `title` and the postings only it
+ * found as a new search, and gives its id; the old one stays as it was, so
+ * the numbers Claude has for its postings still hold. Asks no source.
+ */
+export async function dropSearchTitle(id: string, title: string): Promise<string | null> {
+  const search = await prisma.postingSearch.findUnique({ where: { id } });
+  if (!search) return null;
+  const titles = titleOutcomesSchema.parse(search.titles);
+  const index = titles.findIndex((entry) => entry.title === title);
+  if (index < 0 || titles.length < 2) return null;
+  const left = titles.toSpliced(index, 1);
+  const stillFound = new Set(left.flatMap((entry) => entry.keys));
+  const dropped = new Set(titles[index].keys.filter((key) => !stillFound.has(key)));
+  const postings = postingsOf(search.postings).filter((posting) => !dropped.has(postingKey(posting)));
+  const query = { ...queryOf(search.query), keywords: left.map((entry) => entry.title).join(", ") };
+  const narrowed = await prisma.postingSearch.create({
+    data: {
+      source: search.source,
+      query,
+      postings,
+      found: postings.length,
+      next: nextWithoutTitle(search.next, index),
+      titles: left,
+      createdAt: new Date(search.createdAt.getTime() + 1),
+    },
+    select: { id: true },
+  });
+  return narrowed.id;
 }
 
 /** Every kept search, newest first, grouped by the day it ran in the user's time zone. */

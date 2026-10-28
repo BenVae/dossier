@@ -31,10 +31,19 @@ export async function requestJson(
 
   const detail = `${url.pathname}: HTTP ${response.status}`;
   if (response.status === 401 || response.status === 403) throw jobSearchError("key", source, { detail });
-  if (response.status === 429) throw jobSearchError("quota", source, { detail });
+  // RapidAPI says how many of the plan's requests are left: some, and the 429 is its per-second limit.
+  if (response.status === 429) {
+    const left = response.headers.get("x-ratelimit-requests-remaining");
+    throw jobSearchError(left !== null && left !== "0" ? "limited" : "quota", source, { detail });
+  }
   if (!response.ok) throw jobSearchError(response.status >= 500 ? "unavailable" : "changed", source, { detail });
 
-  const text = await readLimited(response, MAX_BYTES);
+  let text: string | null;
+  try {
+    text = await readLimited(response, MAX_BYTES);
+  } catch {
+    throw jobSearchError("unavailable", source, { detail: `${url.pathname}: ${timeout.aborted ? "timed out" : "answer cut off"}` });
+  }
   if (text === null) throw jobSearchError("changed", source, { detail: `${url.pathname}: answer over ${MAX_BYTES} bytes` });
   try {
     return JSON.parse(text) as unknown;

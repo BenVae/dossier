@@ -11,6 +11,7 @@ import { Button, buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { Country } from "@/lib/job-search/countries";
 import {
+  KEYWORDS_TOO_LONG,
   searchHref,
   searchRunHref,
   viewHref,
@@ -115,10 +116,13 @@ export function JobsScreen({
   }
 
   // Each search is kept and gets its own history entry, so Back returns to it without asking the source again.
-  const run = (next: SearchQuery) =>
+  const run = (next: SearchQuery, onKeywordsError?: (message?: string) => void) =>
     startTransition(async () => {
       const result = await runJobSearch({ query: next });
-      if (!result.ok) return void toast(result.error);
+      if (!result.ok) {
+        onKeywordsError?.(result.fieldErrors?.query?.find((message) => message === KEYWORDS_TOO_LONG));
+        return void toast(result.error);
+      }
       if (!result.data.ok) return void setFailed({ problem: result.data, query: next });
       setFailed(null);
       router.push(searchRunHref(result.data.id), { scroll: false });
@@ -178,7 +182,7 @@ function SearchForm({
   countries: readonly Country[];
   query: SearchQuery;
   pending: boolean;
-  onSearch: (query: SearchQuery) => void;
+  onSearch: (query: SearchQuery, onKeywordsError: (message?: string) => void) => void;
 }) {
   const [form, setForm] = useState(query);
   const [errors, setErrors] = useState<{ keywords?: string; country?: string }>({});
@@ -202,7 +206,7 @@ function SearchForm({
     };
     setErrors(problems);
     if (problems.keywords || problems.country) return;
-    onSearch({ ...form, keywords: form.keywords.trim(), place: form.place.trim() });
+    onSearch({ ...form, keywords: form.keywords.trim(), place: form.place.trim() }, (keywords) => setErrors((current) => ({ ...current, keywords })));
   };
 
   return (
@@ -279,7 +283,7 @@ function SearchProblem({ problem, message, onRetry }: { problem: Problem["proble
         <Link href={SETTINGS_HREF} className={buttonClassName("secondary", "sm")}>
           Open Settings → Job search
         </Link>
-      ) : problem === "unavailable" ? (
+      ) : problem === "unavailable" || problem === "limited" ? (
         <Button variant="secondary" size="sm" onClick={onRetry}>
           Try again
         </Button>

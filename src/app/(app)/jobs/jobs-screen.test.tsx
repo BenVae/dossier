@@ -4,11 +4,12 @@ import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { toast } from "@/components/toast";
-import { EMPTY_QUERY, type PostingState, type ShownPosting, type StoredSearch } from "@/lib/job-search/search";
+import { EMPTY_QUERY, type PostingState, type ShownPosting, type StoredSearch, type TitleOutcome } from "@/lib/job-search/search";
 
 import {
   acceptArbeitsagenturNote,
   dismissFoundPosting,
+  dropTitleFromSearch,
   loadFullText,
   removeJobSearch,
   restorePosting,
@@ -35,6 +36,7 @@ vi.mock("./actions", () => ({
   unsavePosting: vi.fn(),
   dismissFoundPosting: vi.fn(),
   restorePosting: vi.fn(),
+  dropTitleFromSearch: vi.fn(),
 }));
 
 const countries = [
@@ -61,7 +63,15 @@ const posting = (id: string, extra: Partial<ShownPosting> = {}): ShownPosting =>
   ...extra,
 });
 
-const stored = (postings: ShownPosting[], next: string | null = null): StoredSearch => ({ id: "run-1", source: "JSEARCH", query, ranAt: "today at 14:32", postings, next });
+const stored = (postings: ShownPosting[], next: string | null = null, titles: TitleOutcome[] = []): StoredSearch => ({
+  id: "run-1",
+  source: "JSEARCH",
+  query,
+  ranAt: "today at 14:32",
+  postings,
+  next,
+  titles,
+});
 
 const screenProps: ComponentProps<typeof JobsScreen> = {
   source: "JSEARCH",
@@ -164,6 +174,43 @@ describe("the search form", () => {
     expect(screen.getByText("Adzuna has no remote filter, so this adds “remote” to your search.")).toBeInTheDocument();
   });
 
+  it("says what a search of many titles costs, and still runs it", async () => {
+    renderScreen();
+    const what = screen.getByLabelText("What");
+    await userEvent.clear(what);
+    await userEvent.type(what, Array.from({ length: 11 }, (_, i) => `title ${i}`).join(", "));
+    expect(what).toHaveAccessibleDescription(
+      "11 titles: each is a search of its own, so every page asks JSearch 11 times, each counting against your plan. A list this long may not all be searched in time.",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(runJobSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows what the server found wrong with the words under What, until another search is shown", async () => {
+    vi.mocked(runJobSearch).mockResolvedValue({
+      ok: false,
+      error: "Some details aren't valid. Check the highlighted fields.",
+      fieldErrors: { query: ["Too big: expected string to have <=200 characters", "That's too long to search. Shorten the list."] },
+    });
+    const { rerender } = renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(screen.getByLabelText("What")).toHaveAccessibleDescription("Separate several titles with commas. That's too long to search. Shorten the list."));
+    rerender(<JobsScreen {...screenProps} query={{ ...query, keywords: "nurse" }} />);
+    expect(screen.getByLabelText("What")).not.toHaveAccessibleDescription(expect.stringContaining("too long"));
+  });
+
+  it("leaves another field's problem out of What", async () => {
+    vi.mocked(runJobSearch).mockResolvedValue({
+      ok: false,
+      error: "Some details aren't valid. Check the highlighted fields.",
+      fieldErrors: { query: ["Too big: expected string to have <=200 characters"] },
+    });
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Some details aren't valid. Check the highlighted fields."));
+    expect(screen.getByLabelText("What")).not.toHaveAccessibleDescription(expect.stringContaining("Too big"));
+  });
+
   it("follows the URL's search on Back and forward", () => {
     const { rerender } = renderScreen();
     rerender(<JobsScreen {...screenProps} query={{ ...query, keywords: "nurse" }} />);
@@ -256,7 +303,7 @@ describe("the results", () => {
   });
 
   it("loads the next page into the kept search, once each", async () => {
-    vi.mocked(showMorePostings).mockResolvedValue({ ok: true, data: { ok: true, postings: [posting("b"), posting("c")], next: null } });
+    vi.mocked(showMorePostings).mockResolvedValue({ ok: true, data: { ok: true, postings: [posting("b"), posting("c")], next: null, titles: [] } });
     renderScreen({ search: stored([posting("a"), posting("b")], "cursor:2") });
     await userEvent.click(screen.getByRole("button", { name: "Show more" }));
     expect(showMorePostings).toHaveBeenCalledWith({ searchId: "run-1" });
@@ -269,6 +316,50 @@ describe("the results", () => {
     await userEvent.click(screen.getByRole("button", { name: "Search again" }));
     expect(runJobSearch).toHaveBeenCalledWith({ query });
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/jobs?search=run-2", { scroll: false }));
+  });
+
+  it("says how each title of a search with several went, and takes one out without searching", async () => {
+    vi.mocked(dropTitleFromSearch).mockResolvedValue({ ok: true, data: { id: "run-2" } });
+    const titles: TitleOutcome[] = [
+      { title: "designer", keys: ["JSEARCH:a"], total: null, more: true, problem: null },
+      { title: "nurse", keys: [], total: null, more: false, problem: "limited" },
+    ];
+    renderScreen({ search: stored([posting("a")], "each:[]", titles) });
+    const list = screen.getByRole("list", { name: "Titles in this search" });
+    expect(within(list).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "designer1 found, more to come×",
+      "nurseJSearch limited the search. Search again to retry×",
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: "Remove “nurse” from this search" }));
+    expect(dropTitleFromSearch).toHaveBeenCalledWith({ searchId: "run-1", title: "nurse" });
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/jobs?search=run-2", { scroll: false }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove “designer” from this search" }));
+    expect(dropTitleFromSearch).toHaveBeenCalledTimes(1);
+    expect(runJobSearch).not.toHaveBeenCalled();
+  });
+
+  it("says a source without a plan limited a title, not that its searches are used up", () => {
+    const titles: TitleOutcome[] = [
+      { title: "designer", keys: ["ARBEITSAGENTUR:a"], total: 40, more: true, problem: null },
+      { title: "nurse", keys: [], total: null, more: false, problem: "quota" },
+    ];
+    renderScreen({ search: { ...stored([posting("a")], "each:[]", titles), source: "ARBEITSAGENTUR" } });
+    expect(within(screen.getByRole("list", { name: "Titles in this search" })).getAllByRole("listitem")[1]).toHaveTextContent(
+      "Bundesagentur für Arbeit limited the search. Search again to retry",
+    );
+  });
+
+  it("leaves the titles out for a search of one", () => {
+    renderScreen({ search: stored([posting("a")]) });
+    expect(screen.queryByRole("list", { name: "Titles in this search" })).not.toBeInTheDocument();
+  });
+
+  it("still says why the one title left found nothing, without a ×", () => {
+    renderScreen({ search: stored([], null, [{ title: "nurse", keys: [], total: null, more: false, problem: "limited" }]) });
+    expect(within(screen.getByRole("list", { name: "Titles in this search" })).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "nurseJSearch limited the search. Search again to retry",
+    ]);
+    expect(screen.queryByRole("button", { name: "Remove “nurse” from this search" })).not.toBeInTheDocument();
   });
 
   it("says when the next page didn't come", async () => {
@@ -343,7 +434,7 @@ describe("the results", () => {
 });
 
 describe("problems", () => {
-  const failWith = async (problem: "key" | "quota", message: string) => {
+  const failWith = async (problem: "key" | "quota" | "limited", message: string) => {
     vi.mocked(runJobSearch).mockResolvedValue({ ok: true, data: { ok: false, problem, message } });
     renderScreen({ search: stored([posting("a")]) });
     await userEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -354,6 +445,11 @@ describe("problems", () => {
     expect(await failWith("key", "JSearch didn't accept your key.")).toHaveTextContent("JSearch didn't accept your key.");
     expect(screen.getByRole("link", { name: "Open Settings → Job search" })).toHaveAttribute("href", "/settings?section=jobs");
     expect(screen.queryByRole("list", { name: "Postings" })).not.toBeInTheDocument();
+  });
+
+  it("offers Try again when the source is limiting searches", async () => {
+    const alert = await failWith("limited", "JSearch is limiting searches right now.");
+    expect(within(alert).getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("just says so when the quota is used up", async () => {

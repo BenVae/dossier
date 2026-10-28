@@ -101,7 +101,7 @@ async function searchPage(query: SearchQuery, credentials: SourceCredentials["AD
     postings.push(postingFromResult(result.data, query.country));
   }
   const total = answer.data.count ?? 0;
-  return { postings, next: page * PAGE_SIZE < total && answer.data.results.length > 0 ? `page:${page + 1}` : null };
+  return { postings, next: page * PAGE_SIZE < total && answer.data.results.length > 0 ? `page:${page + 1}` : null, total };
 }
 
 export const adzuna: JobSourceAdapter<"ADZUNA"> = {

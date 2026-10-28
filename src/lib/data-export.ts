@@ -303,12 +303,13 @@ const posting = z.object({
   updatedAt: date,
 });
 
-/** A search kept with what it found (E14-10); its search and postings are checked when it's opened. */
+/** A search kept with what it found (E14-10); its search, postings and titles are checked when it's opened. */
 const postingSearch = z.object({
   id: text,
   source: z.enum(PostingSource),
   query: z.unknown(),
   postings: z.unknown(),
+  titles: z.unknown().default([]),
   found: int,
   next: text.nullable(),
   createdAt: date,
