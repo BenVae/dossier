@@ -186,15 +186,29 @@ describe("the search form", () => {
     expect(runJobSearch).toHaveBeenCalledTimes(1);
   });
 
-  it("shows what the server found wrong with the words under What", async () => {
+  it("shows what the server found wrong with the words under What, until another search is shown", async () => {
     vi.mocked(runJobSearch).mockResolvedValue({
       ok: false,
       error: "Some details aren't valid. Check the highlighted fields.",
-      fieldErrors: { query: ["That's too long to search. Shorten the list."] },
+      fieldErrors: { query: ["Too big: expected string to have <=200 characters", "That's too long to search. Shorten the list."] },
+    });
+    const { rerender } = renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(screen.getByLabelText("What")).toHaveAccessibleDescription("Separate several titles with commas. That's too long to search. Shorten the list."));
+    rerender(<JobsScreen {...screenProps} query={{ ...query, keywords: "nurse" }} />);
+    expect(screen.getByLabelText("What")).not.toHaveAccessibleDescription(expect.stringContaining("too long"));
+  });
+
+  it("leaves another field's problem out of What", async () => {
+    vi.mocked(runJobSearch).mockResolvedValue({
+      ok: false,
+      error: "Some details aren't valid. Check the highlighted fields.",
+      fieldErrors: { query: ["Too big: expected string to have <=200 characters"] },
     });
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Search" }));
-    await waitFor(() => expect(screen.getByLabelText("What")).toHaveAccessibleDescription(expect.stringContaining("That's too long to search. Shorten the list.")));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Some details aren't valid. Check the highlighted fields."));
+    expect(screen.getByLabelText("What")).not.toHaveAccessibleDescription(expect.stringContaining("Too big"));
   });
 
   it("follows the URL's search on Back and forward", () => {

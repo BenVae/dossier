@@ -11,6 +11,7 @@ import { Button, buttonClassName } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { Country } from "@/lib/job-search/countries";
 import {
+  KEYWORDS_TOO_LONG,
   searchHref,
   searchRunHref,
   viewHref,
@@ -77,8 +78,6 @@ export function JobsScreen({
   const [pending, startTransition] = useTransition();
   // A search that didn't work, with what was asked, for Try again.
   const [failed, setFailed] = useState<{ problem: Problem; query: SearchQuery } | null>(null);
-  // What the server found wrong with the search's words, shown under What.
-  const [keywordsError, setKeywordsError] = useState<string>();
   const header = (
     <>
       <PageHeader
@@ -117,11 +116,13 @@ export function JobsScreen({
   }
 
   // Each search is kept and gets its own history entry, so Back returns to it without asking the source again.
-  const run = (next: SearchQuery) =>
+  const run = (next: SearchQuery, onKeywordsError?: (message?: string) => void) =>
     startTransition(async () => {
       const result = await runJobSearch({ query: next });
-      setKeywordsError(result.ok ? undefined : result.fieldErrors?.query?.[0]);
-      if (!result.ok) return void toast(result.error);
+      if (!result.ok) {
+        onKeywordsError?.(result.fieldErrors?.query?.find((message) => message === KEYWORDS_TOO_LONG));
+        return void toast(result.error);
+      }
       if (!result.data.ok) return void setFailed({ problem: result.data, query: next });
       setFailed(null);
       router.push(searchRunHref(result.data.id), { scroll: false });
@@ -140,7 +141,7 @@ export function JobsScreen({
     <>
       {header}
       {arbeitsagenturNote && <ArbeitsagenturNote accepted={false} onAccept={acceptArbeitsagentur} className="mx-10 mb-5 max-w-[760px]" />}
-      <SearchForm source={source} countries={countries} query={query} pending={pending} keywordsError={keywordsError} onSearch={run} />
+      <SearchForm source={source} countries={countries} query={query} pending={pending} onSearch={run} />
       {/* Announces each new set of results; the list itself is replaced. */}
       <p role="status" className="sr-only">
         {pending ? "Searching…" : failed ? failed.problem.message : search ? `${search.postings.length} postings found.` : ""}
@@ -175,15 +176,13 @@ function SearchForm({
   countries,
   query,
   pending,
-  keywordsError,
   onSearch,
 }: {
   source: JobSource;
   countries: readonly Country[];
   query: SearchQuery;
   pending: boolean;
-  keywordsError?: string;
-  onSearch: (query: SearchQuery) => void;
+  onSearch: (query: SearchQuery, onKeywordsError: (message?: string) => void) => void;
 }) {
   const [form, setForm] = useState(query);
   const [errors, setErrors] = useState<{ keywords?: string; country?: string }>({});
@@ -207,7 +206,7 @@ function SearchForm({
     };
     setErrors(problems);
     if (problems.keywords || problems.country) return;
-    onSearch({ ...form, keywords: form.keywords.trim(), place: form.place.trim() });
+    onSearch({ ...form, keywords: form.keywords.trim(), place: form.place.trim() }, (keywords) => setErrors((current) => ({ ...current, keywords })));
   };
 
   return (
@@ -218,7 +217,7 @@ function SearchForm({
       onSubmit={submit}
       className="mx-10 mb-7 grid grid-cols-1 items-start gap-x-4 gap-y-4 rounded-panel border border-line-card bg-card p-6 sm:grid-cols-2 lg:grid-cols-[2fr_1.5fr_1.3fr_1fr_1fr]"
     >
-      <SearchFields value={form} onChange={set} source={source} countries={countries} errors={{ ...errors, keywords: errors.keywords ?? keywordsError }} />
+      <SearchFields value={form} onChange={set} source={source} countries={countries} errors={errors} />
       <div className="flex flex-wrap items-center justify-between gap-4 sm:col-span-2 lg:col-span-5">
         <RemoteOnlyField value={form} onChange={set} source={source} />
         <Button type="submit" aria-disabled={pending || undefined}>

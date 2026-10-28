@@ -89,6 +89,14 @@ describe("searchPostings", () => {
     expect(requests).toHaveLength(3);
   });
 
+  it("waits between requests only, not before titles it doesn't ask", async () => {
+    const requests = stubFetch(() => json(jsearchV2LastPage));
+    const started = Date.now();
+    await searchPostings("JSEARCH", ninja, { ...query, keywords: "a, b, c, d, e" }, 'each:["cursor:A","cursor:B","cursor:C",null,null]');
+    expect(requests).toHaveLength(3);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
   it("goes on asking the other titles when a source without a plan limits one", async () => {
     const requests = stubFetch(({ url }) => {
       const was = url.searchParams.get("was")!;

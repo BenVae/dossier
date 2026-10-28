@@ -85,6 +85,7 @@ export async function searchPostings<S extends JobSource>(
     let waiting = 0;
     let stopped: JobSearchError | null = null;
     const work = async () => {
+      let answered = false;
       while (waiting < titles.length) {
         const index = waiting++;
         const cursor = cursors?.[index] ?? null;
@@ -95,10 +96,12 @@ export async function searchPostings<S extends JobSource>(
           pages[index] = hit;
           continue;
         }
+        if (answered && !stopped && !signal.aborted) await new Promise((resolve) => setTimeout(resolve, SPACING_MS));
         if (stopped || signal.aborted) {
           errors[index] = stopped ?? jobSearchError("unavailable", source);
           continue;
         }
+        answered = true;
         try {
           pages[index] = await ask(source, credentials, asked, cursor, { ...context, signal });
         } catch (error) {
@@ -106,7 +109,6 @@ export async function searchPostings<S extends JobSource>(
           errors[index] = error;
           if (error.problem === "key" || (error.problem === "quota" && SOURCE_INFO[source].quotaPeriod)) stopped = error;
         }
-        if (waiting < titles.length && !stopped && !signal.aborted) await new Promise((resolve) => setTimeout(resolve, SPACING_MS));
       }
     };
     await Promise.all(Array.from({ length: AT_ONCE }, work));

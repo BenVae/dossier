@@ -40,6 +40,7 @@ const POSTED_VALUES = POSTED_WITHIN.map((option) => option.value) as [PostedWith
  * which may be long (each title is its own search).
  */
 export const MAX_KEYWORDS = 5000;
+export const KEYWORDS_TOO_LONG = "That's too long to search. Shorten the list.";
 
 /** Over this many titles, the form says what a search that size costs. */
 export const MANY_TITLES = 10;
@@ -53,7 +54,7 @@ export const splitTitles = (keywords: string) =>
 
 /** One search, as every source gets it. */
 export const searchQuerySchema = z.object({
-  keywords: z.string().trim().max(MAX_KEYWORDS, "That's too long to search. Shorten the list."),
+  keywords: z.string().trim().max(MAX_KEYWORDS, KEYWORDS_TOO_LONG),
   /** A city or region; empty searches the whole country. */
   place: z.string().trim().max(200),
   /** ISO 3166-1 alpha-2 in lower case, e.g. "de"; empty until one is chosen. */
