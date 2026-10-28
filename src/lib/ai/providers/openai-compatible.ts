@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { ReasoningEffort } from "openai/resources/shared";
 
-import { BaseProvider, type ChatAnswer, type ChatCall, withSchemaInstructions } from "../provider";
+import { BaseProvider, withJsonSchema, type ChatAnswer, type ChatCall } from "../provider";
 import { keyGuardedFetch } from "./guarded-fetch";
 
 /** How to ask for JSON, strongest first (E6-4). */
@@ -95,7 +95,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
   private async send(call: ChatCall, { noTemperature, maxCompletionTokens, noEffort, json }: Quirks): Promise<ChatAnswer> {
     const effort = noEffort ? undefined : this.reasoningEffort(call);
     // Without schema support, the schema goes into the instructions instead.
-    const system = call.json && json !== "schema" ? withSchemaInstructions(call.system, call.json.schema) : call.system;
+    const system = call.json && json !== "schema" ? withJsonSchema(call.system, call.json.schema) : call.system;
     const responseFormat = !call.json
       ? {}
       : json === "schema"

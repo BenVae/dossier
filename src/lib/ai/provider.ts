@@ -217,6 +217,11 @@ function matchingBracket(text: string, start: number): number {
   return -1;
 }
 
+/** `system` with the answer's JSON schema spelled out, for a model that can't be sent it or does better seeing it. */
+export function withJsonSchema(system: string, schema: z.ZodType): string {
+  return `${system}\n\nReply with only a JSON object, no other text, that matches this JSON schema:\n${JSON.stringify(toJSONSchema(schema))}`;
+}
+
 const MAX_PROBLEM_LENGTH = 1_000;
 
 /** Parses and validates an answer; `problem` says what's wrong, in words a model can fix. */
@@ -230,9 +235,4 @@ export function validateJson<T>(text: string, schema: z.ZodType<T>): { ok: true;
   const result = schema.safeParse(value);
   if (result.success) return { ok: true, data: result.data };
   return { ok: false, problem: prettifyError(result.error).slice(0, MAX_PROBLEM_LENGTH) };
-}
-
-/** `system` with the schema spelled out, for when the server won't enforce it. */
-export function withSchemaInstructions(system: string, schema: z.ZodType): string {
-  return `${system}\n\nReply with only a JSON object, no other text, that matches this JSON schema:\n${JSON.stringify(toJSONSchema(schema))}`;
 }

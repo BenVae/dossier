@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
 import { AiError } from "../errors";
-import { BaseProvider, type ChatAnswer, type ChatCall, type Effort, withSchemaInstructions } from "../provider";
+import { BaseProvider, withJsonSchema, type ChatAnswer, type ChatCall, type Effort } from "../provider";
 import { keyGuardedFetch } from "./guarded-fetch";
 
 /** Offered when the model list can't be fetched, e.g. before a key is saved. */
@@ -66,7 +66,7 @@ export class AnthropicProvider extends BaseProvider {
       {
         model: call.model,
         max_tokens: call.maxTokens + THINKING_TOKENS,
-        system: call.json && !enforceSchema ? withSchemaInstructions(call.system, call.json.schema) : call.system,
+        system: call.json && !enforceSchema ? withJsonSchema(call.system, call.json.schema) : call.system,
         messages: call.messages,
         ...(Object.keys(outputConfig).length > 0 ? { output_config: outputConfig } : {}),
       },
