@@ -123,7 +123,7 @@ async function searchPage(query: SearchQuery, next: string | null, context: Requ
     postings.push(postingFromOffer(offer.data));
   }
   const total = answer.data.maxErgebnisse ?? 0;
-  return { postings, next: page * PAGE_SIZE < total && list.length > 0 ? `page:${page + 1}` : null };
+  return { postings, next: page * PAGE_SIZE < total && list.length > 0 ? `page:${page + 1}` : null, total };
 }
 
 /** The description from the details endpoint, else from the posting's page, else null. */

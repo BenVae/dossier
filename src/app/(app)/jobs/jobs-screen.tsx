@@ -77,6 +77,8 @@ export function JobsScreen({
   const [pending, startTransition] = useTransition();
   // A search that didn't work, with what was asked, for Try again.
   const [failed, setFailed] = useState<{ problem: Problem; query: SearchQuery } | null>(null);
+  // What the server found wrong with the search's words, shown under What.
+  const [keywordsError, setKeywordsError] = useState<string>();
   const header = (
     <>
       <PageHeader
@@ -118,6 +120,7 @@ export function JobsScreen({
   const run = (next: SearchQuery) =>
     startTransition(async () => {
       const result = await runJobSearch({ query: next });
+      setKeywordsError(result.ok ? undefined : result.fieldErrors?.query?.[0]);
       if (!result.ok) return void toast(result.error);
       if (!result.data.ok) return void setFailed({ problem: result.data, query: next });
       setFailed(null);
@@ -137,7 +140,7 @@ export function JobsScreen({
     <>
       {header}
       {arbeitsagenturNote && <ArbeitsagenturNote accepted={false} onAccept={acceptArbeitsagentur} className="mx-10 mb-5 max-w-[760px]" />}
-      <SearchForm source={source} countries={countries} query={query} pending={pending} onSearch={run} />
+      <SearchForm source={source} countries={countries} query={query} pending={pending} keywordsError={keywordsError} onSearch={run} />
       {/* Announces each new set of results; the list itself is replaced. */}
       <p role="status" className="sr-only">
         {pending ? "Searching…" : failed ? failed.problem.message : search ? `${search.postings.length} postings found.` : ""}
@@ -147,7 +150,8 @@ export function JobsScreen({
           <SearchProblem problem={failed.problem.problem} message={failed.problem.message} onRetry={() => run(failed.query)} />
         ) : search ? (
           <PostingResults
-            key={search.id}
+            // Taking a title out of the search shows it anew.
+            key={`${search.id}:${search.query.keywords}`}
             mode="search"
             search={search}
             today={today}
@@ -172,12 +176,14 @@ function SearchForm({
   countries,
   query,
   pending,
+  keywordsError,
   onSearch,
 }: {
   source: JobSource;
   countries: readonly Country[];
   query: SearchQuery;
   pending: boolean;
+  keywordsError?: string;
   onSearch: (query: SearchQuery) => void;
 }) {
   const [form, setForm] = useState(query);
@@ -213,7 +219,7 @@ function SearchForm({
       onSubmit={submit}
       className="mx-10 mb-7 grid grid-cols-1 items-start gap-x-4 gap-y-4 rounded-panel border border-line-card bg-card p-6 sm:grid-cols-2 lg:grid-cols-[2fr_1.5fr_1.3fr_1fr_1fr]"
     >
-      <SearchFields value={form} onChange={set} source={source} countries={countries} errors={errors} />
+      <SearchFields value={form} onChange={set} source={source} countries={countries} errors={{ ...errors, keywords: errors.keywords ?? keywordsError }} />
       <div className="flex flex-wrap items-center justify-between gap-4 sm:col-span-2 lg:col-span-5">
         <RemoteOnlyField value={form} onChange={set} source={source} />
         <Button type="submit" aria-disabled={pending || undefined}>
@@ -279,7 +285,7 @@ function SearchProblem({ problem, message, onRetry }: { problem: Problem["proble
         <Link href={SETTINGS_HREF} className={buttonClassName("secondary", "sm")}>
           Open Settings → Job search
         </Link>
-      ) : problem === "unavailable" ? (
+      ) : problem === "unavailable" || problem === "limited" ? (
         <Button variant="secondary" size="sm" onClick={onRetry}>
           Try again
         </Button>

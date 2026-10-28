@@ -82,11 +82,11 @@ describe("Arbeitsagentur search", () => {
     ]);
   });
 
-  it("stops at the last page, and reads a missing list as none", async () => {
+  it("stops at the last page, says how many there are in all, and reads a missing list as none", async () => {
     stubFetch(() => json({ ...arbeitsagenturPage, maxErgebnisse: 2 }));
-    expect((await arbeitsagentur.search(query, {}, null)).next).toBeNull();
+    expect(await arbeitsagentur.search(query, {}, null)).toMatchObject({ next: null, total: 2 });
     stubFetch(() => json({ maxErgebnisse: 0 }));
-    expect(await arbeitsagentur.search(query, {}, null)).toEqual({ postings: [], next: null });
+    expect(await arbeitsagentur.search(query, {}, null)).toEqual({ postings: [], next: null, total: 0 });
   });
 
   it("says the search changed when it's refused, since there's no key to blame", async () => {

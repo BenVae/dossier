@@ -10,6 +10,7 @@ import { jsearchV2LastPage } from "@/test/job-search-fixtures";
 
 import {
   dismissFoundPosting,
+  dropTitleFromSearch,
   loadFullText,
   removeJobSearch,
   restorePosting,
@@ -73,10 +74,17 @@ describe("Find jobs actions", () => {
     const id = run.ok && run.data.ok ? run.data.id : "";
 
     stubFetch(() => json(jsearchV2LastPage));
-    expect(await showMorePostings({ searchId: id })).toEqual({ ok: true, data: { ok: true, postings: [], next: null } });
+    expect(await showMorePostings({ searchId: id })).toEqual({ ok: true, data: { ok: true, postings: [], next: null, titles: [] } });
 
     expect(await removeJobSearch({ id })).toEqual({ ok: true, data: null, toast: "Search removed. Saved postings from it stay in Saved." });
     expect(await prisma().postingSearch.count()).toBe(0);
+  });
+
+  it("takes a title out of a kept search of several", async () => {
+    const titles = ["designer", "nurse"].map((title) => ({ title, keys: [], total: null, more: false, problem: null }));
+    const search = await prisma().postingSearch.create({ data: { source: "JSEARCH", query: { ...query, keywords: "designer, nurse" }, postings: [], titles } });
+    expect(await dropTitleFromSearch({ searchId: search.id, title: "nurse" })).toEqual({ ok: true, data: null, toast: "Removed “nurse” from this search." });
+    expect(await prisma().postingSearch.findUniqueOrThrow({ where: { id: search.id } })).toMatchObject({ query: { keywords: "designer" }, titles: [] });
   });
 
   it("says why a search didn't run", async () => {

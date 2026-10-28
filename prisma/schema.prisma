@@ -710,6 +710,8 @@ model PostingSearch {
   found     Int           @default(0)
   /// What to ask the source for the next page; null on the last one.
   next      String?
+  /// How each title went, for a search of several (titleOutcomesSchema); empty otherwise.
+  titles    Json          @default("[]")
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 

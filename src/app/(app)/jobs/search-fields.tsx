@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { Country } from "@/lib/job-search/countries";
-import { POSTED_WITHIN, RADII_KM, type JobSource, type RadiusKm, type SearchQuery } from "@/lib/job-search/search";
+import { MANY_TITLES, POSTED_WITHIN, RADII_KM, splitTitles, type JobSource, type RadiusKm, type SearchQuery } from "@/lib/job-search/search";
 import { SOURCE_INFO, sourceCovers } from "@/lib/job-search/sources";
 
 // A search's fields, as Find jobs asks them (E14-6) and Settings → Job agent
@@ -17,6 +17,13 @@ export function uncoveredCountry(source: JobSource | null, query: SearchQuery, c
   if (!source || !query.country || sourceCovers(source, query.country)) return undefined;
   const name = countries.find((country) => country.code === query.country)?.name ?? query.country.toUpperCase();
   return `${SOURCE_INFO[source].name} doesn't list jobs in ${name}.`;
+}
+
+/** What a search of many titles costs: each title is a search of its own. */
+function manyTitles(count: number, source: JobSource | null): string {
+  const name = source ? SOURCE_INFO[source].name : "the job source";
+  const plan = source && SOURCE_INFO[source].quotaPeriod ? ", each counting against your plan" : "";
+  return `${count} titles: each is a search of its own, so every page asks ${name} ${count} times${plan}. A list this long may not all be searched in time.`;
 }
 
 /** What, Where, Country, Within and Posted, for a grid; Remote only is RemoteOnlyField. */
@@ -37,6 +44,7 @@ export function SearchFields({
   onBlur?: () => void;
 }) {
   const uncovered = uncoveredCountry(source, value, countries);
+  const titles = splitTitles(value.keywords).length;
   return (
     <>
       <Input
@@ -44,7 +52,7 @@ export function SearchFields({
         className="sm:col-span-2 lg:col-span-1"
         value={value.keywords}
         placeholder="Job title, skill or company"
-        hint="Separate several titles with commas."
+        hint={titles > MANY_TITLES ? manyTitles(titles, source) : "Separate several titles with commas."}
         error={errors.keywords}
         onChange={(event) => onChange({ keywords: event.target.value })}
         onBlur={onBlur}

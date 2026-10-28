@@ -81,6 +81,19 @@ test("says when nothing was found", async ({ page }) => {
   await expect(page.getByText("No postings for “nothing” within 25 km of Rotterdam. Try a bigger radius or fewer words.")).toBeVisible();
 });
 
+test("keeps what several titles found when one is limited, and takes that one out", async ({ page }) => {
+  await page.goto("/jobs?q=UX+Designer%2C+limited&where=Rotterdam&country=nl");
+  const form = page.getByRole("search", { name: "Search postings" });
+  await form.getByRole("button", { name: "Search" }).click();
+  const titles = page.getByRole("list", { name: "Titles in this search" });
+  await expect(titles.getByRole("listitem")).toHaveText(["UX Designer3 found, more to come×", "limitedJSearch limited the search. Search again to retry×"]);
+  await expect(page.getByRole("list", { name: "Postings" }).getByRole("listitem")).toHaveCount(3);
+
+  await page.getByRole("button", { name: "Remove “limited” from this search" }).click();
+  await expect(titles).toHaveCount(0);
+  await expect(form.getByLabel("What")).toHaveValue("UX Designer");
+});
+
 test("tests the connection in Settings → Job search", async ({ page }) => {
   await page.goto("/settings?section=jobs");
   await expect(page.getByRole("radio", { name: "JSearch" })).toBeChecked();

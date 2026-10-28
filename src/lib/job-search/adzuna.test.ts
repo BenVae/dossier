@@ -81,9 +81,9 @@ describe("Adzuna search", () => {
     ]);
   });
 
-  it("stops at the last page", async () => {
+  it("stops at the last page, and says how many there are in all", async () => {
     stubFetch(() => json({ ...adzunaPage, count: 45 }));
-    expect((await adzuna.search(query, credentials, "page:3")).next).toBeNull();
+    expect(await adzuna.search(query, credentials, "page:3")).toMatchObject({ next: null, total: 45 });
     stubFetch(() => json({ results: [], count: 0 }));
     expect((await adzuna.search(query, credentials, null)).next).toBeNull();
   });

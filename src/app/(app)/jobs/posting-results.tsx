@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 
 import { ScoreBadge } from "@/components/score-badge";
@@ -12,10 +13,19 @@ import { openPendingTab, sendPendingTab } from "@/lib/claude-tab";
 import { cn } from "@/lib/cn";
 import { fitBand, type PostingFit } from "@/lib/fit";
 import type { JobView } from "@/lib/jobs/runner";
-import { postedAgo, postingKey, type FoundPosting, type PostingState, type ShownPosting, type StoredSearch } from "@/lib/job-search/search";
+import { postedAgo, postingKey, type FoundPosting, type PostingState, type ShownPosting, type StoredSearch, type TitleOutcome } from "@/lib/job-search/search";
 import { arbeitsagenturPage, SOURCE_INFO } from "@/lib/job-search/sources";
 
-import { dismissFoundPosting, loadFullText, restorePosting, savePostingForLater, showMorePostings, startScoringPosting, unsavePosting } from "./actions";
+import {
+  dismissFoundPosting,
+  dropTitleFromSearch,
+  loadFullText,
+  restorePosting,
+  savePostingForLater,
+  showMorePostings,
+  startScoringPosting,
+  unsavePosting,
+} from "./actions";
 import { useStartApplication } from "./use-start-application";
 
 /** Narrow windows show the posting above the list. */
@@ -49,6 +59,8 @@ export function PostingResults(props: PostingResultsProps) {
   const { mode } = props;
   const [postings, setPostings] = useState(mode === "search" ? props.search.postings : props.postings);
   const [next, setNext] = useState(mode === "search" ? props.search.next : null);
+  const [titles, setTitles] = useState(mode === "search" ? props.search.titles : []);
+  const router = useRouter();
   const [loadingMore, setLoadingMore] = useState(false);
   const [showDismissed, setShowDismissed] = useState(false);
   const inView = ({ state }: ShownPosting) => (mode === "saved" ? state.saved : mode === "dismissed" ? state.dismissed : showDismissed || !state.dismissed);
@@ -154,6 +166,12 @@ export function PostingResults(props: PostingResultsProps) {
     const seen = new Set(postings.map(postingKey));
     setPostings([...postings, ...result.data.postings.filter((posting) => !seen.has(postingKey(posting)))]);
     setNext(result.data.next);
+    setTitles(result.data.titles);
+  };
+
+  const drop = async (title: string) => {
+    if (props.mode !== "search") return;
+    if (toastResult(await dropTitleFromSearch({ searchId: props.search.id, title })).ok) router.refresh();
   };
 
   const searched = props.mode === "search" ? props.search.query : null;
@@ -202,6 +220,10 @@ export function PostingResults(props: PostingResultsProps) {
           )}
         </p>
 
+        {props.mode === "search" && titles.length > 1 && (
+          <TitleCounts titles={titles} source={props.search.source} onDrop={(title) => void drop(title)} />
+        )}
+
         {visible.length === 0 ? (
           <div className="rounded-panel border border-line-card bg-card px-5 py-9 text-center text-sm text-muted">{empty}</div>
         ) : (
@@ -241,6 +263,45 @@ export function PostingResults(props: PostingResultsProps) {
         </PostingDetail>
       )}
     </div>
+  );
+}
+
+/** What one title of the search found, or why it found nothing. */
+function titleStatus({ keys, total, more, problem }: TitleOutcome, name: string): string {
+  const found = total === null ? `${keys.length} found${more ? ", more to come" : ""}` : `${keys.length} of ${total.toLocaleString("en-US")}`;
+  if (!problem) return found;
+  const why =
+    problem === "limited"
+      ? `${name} limited the search. Search again to retry`
+      : problem === "quota"
+        ? `Your ${name} searches are used up`
+        : problem === "unavailable"
+          ? "Didn't answer in time. Search again to retry"
+          : "Couldn't be searched";
+  return keys.length > 0 ? `${found} · ${why}` : why;
+}
+
+/** How many postings each title found, for a search of several, with × to take one out of the search. */
+function TitleCounts({ titles, source, onDrop }: { titles: TitleOutcome[]; source: StoredSearch["source"]; onDrop: (title: string) => void }) {
+  return (
+    <ul aria-label="Titles in this search" className="flex flex-col rounded-card border border-line-card bg-card px-4 py-1 text-meta">
+      {titles.map((title) => (
+        <li key={title.title} className="flex items-center gap-3 border-b border-line py-1.5 last:border-b-0">
+          <span className="min-w-0 flex-1 truncate font-medium text-ink">{title.title}</span>
+          <span className={cn("text-right", title.problem ? "text-warning" : title.keys.length === 0 ? "text-faint" : "text-muted")}>
+            {titleStatus(title, SOURCE_INFO[source].name)}
+          </span>
+          <button
+            type="button"
+            aria-label={`Remove “${title.title}” from this search`}
+            onClick={() => onDrop(title.title)}
+            className="rounded-control px-1.5 py-1 text-base leading-none text-muted hover:text-ink"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
