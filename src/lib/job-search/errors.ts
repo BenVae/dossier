@@ -46,7 +46,10 @@ export function jobSearchError(problem: JobSearchProblem, source: JobSource, { c
     off: `${name} isn't offered on this server. Choose another source in Settings → Job search.`,
     "not-accepted": `Read the note about ${name} and tick “I understand” before Dossier searches it.`,
     "no-key": `Add your ${name} ${source === "ADZUNA" ? "app ID and key" : "key"} in Settings → Job search first.`,
-    key: `${name} didn't accept your key. Check it in Settings → Job search.`,
+    key:
+      source === "RWTH"
+        ? `${name} refused the search. Try again later, or another source in Settings → Job search.`
+        : `${name} didn't accept your key. Check it in Settings → Job search.`,
     quota: quotaPeriod ? `You've used up your ${name} searches for ${quotaPeriod}. Try again then, or move to a bigger plan.` : limited,
     limited,
     country: `${name} doesn't list jobs in ${countryName(country)}. Choose another country, or another source in Settings → Job search.`,
@@ -54,7 +57,9 @@ export function jobSearchError(problem: JobSearchProblem, source: JobSource, { c
     changed:
       source === "ARBEITSAGENTUR"
         ? "The Arbeitsagentur's job search has changed or isn't answering. Try another source in Settings → Job search."
-        : `${name} answered in a way Dossier doesn't understand; its service may have changed. Try again later.`,
+        : source === "RWTH"
+          ? "The RWTH job portal has changed or isn't answering. Try another source in Settings → Job search."
+          : `${name} answered in a way Dossier doesn't understand; its service may have changed. Try again later.`,
   }[problem];
   return new JobSearchError(problem, message, detail ? `${source}: ${detail}` : undefined);
 }

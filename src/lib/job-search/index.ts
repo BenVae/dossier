@@ -8,6 +8,7 @@ import { JobSearchError, jobSearchError } from "./errors";
 import { adzuna } from "./adzuna";
 import { arbeitsagentur } from "./arbeitsagentur";
 import { jsearch } from "./jsearch";
+import { rwth } from "./rwth";
 import { postingKey, splitTitles, type FoundPosting, type JobSource, type SearchPage, type SearchQuery } from "./search";
 import { SOURCE_INFO, sourceCovers } from "./sources";
 
@@ -23,6 +24,7 @@ const ADAPTERS: { [S in JobSource]: JobSourceAdapter<S> } = {
   JSEARCH: jsearch,
   ADZUNA: adzuna,
   ARBEITSAGENTUR: arbeitsagentur,
+  RWTH: rwth,
 };
 
 const adapterFor = <S extends JobSource>(source: S) => ADAPTERS[source] as JobSourceAdapter<S>;

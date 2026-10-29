@@ -10,17 +10,25 @@ import type { JobSource } from "./search";
 export const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_BYTES = 5 * 1024 * 1024;
 
+type RequestOptions = { headers?: Record<string, string>; signal?: AbortSignal };
+
 /** GETs JSON from a source, turning every failure into a JobSearchError. */
-export async function requestJson(
-  source: JobSource,
-  url: URL,
-  { headers = {}, signal }: { headers?: Record<string, string>; signal?: AbortSignal } = {},
-): Promise<unknown> {
+export async function requestJson(source: JobSource, url: URL, { headers = {}, signal }: RequestOptions = {}): Promise<unknown> {
+  const text = await requestText(source, url, { headers: { accept: "application/json", ...headers }, signal });
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw jobSearchError("changed", source, { detail: `${url.pathname}: not JSON` });
+  }
+}
+
+/** GETs a page from a source as text, turning every failure into a JobSearchError. */
+export async function requestText(source: JobSource, url: URL, { headers = {}, signal }: RequestOptions = {}): Promise<string> {
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetch(url, {
-      headers: { accept: "application/json", ...headers },
+      headers,
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       cache: "no-store",
     });
@@ -45,11 +53,7 @@ export async function requestJson(
     throw jobSearchError("unavailable", source, { detail: `${url.pathname}: ${timeout.aborted ? "timed out" : "answer cut off"}` });
   }
   if (text === null) throw jobSearchError("changed", source, { detail: `${url.pathname}: answer over ${MAX_BYTES} bytes` });
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw jobSearchError("changed", source, { detail: `${url.pathname}: not JSON` });
-  }
+  return text;
 }
 
 /** The body as text, or null when it's bigger than `limit` bytes. */
@@ -68,5 +72,6 @@ async function readLimited(response: Response, limit: number): Promise<string | 
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  // The RWTH portal's listings come in ISO-8859-1.
+  return Buffer.concat(chunks).toString(/charset=["']?(iso-8859-1|latin1)\b/i.test(response.headers.get("content-type") ?? "") ? "latin1" : "utf8");
 }
