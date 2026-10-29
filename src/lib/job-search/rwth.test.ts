@@ -48,6 +48,13 @@ describe("RWTH search", () => {
         postedAt: "2026-10-05T00:00:00.000Z",
         url: "https://www.rwth-aachen.de/go/id/kbag/file/V000011524/",
       },
+      {
+        ...shared,
+        externalId: "V000011580",
+        title: "Research Assistant/Associate (f/m/d) – Physical AI & Robot Learning",
+        postedAt: "2026-10-05T00:00:00.000Z",
+        url: "https://www.rwth-aachen.de/go/id/kbag/file/V000011580/lidx/1/",
+      },
     ]);
   });
 

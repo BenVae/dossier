@@ -30,14 +30,15 @@ async function searchPage(query: SearchQuery, next: string | null, context: Requ
 
   const postings: FoundPosting[] = [];
   for (const link of root.querySelectorAll('table.results a[href^="/go/id/kbag/file/"]')) {
-    // "Research Assistant (f/m/d) [V000011619]", then "[published 19/10/2026]" in the same cell.
+    // "Research Assistant (f/m/d) [V000011619]", maybe a topic line, then "[published 19/10/2026]" in the same cell.
     const [, title, reference] = /^(.*?)\s*\[([^\]]+)\]$/.exec(link.text.trim()) ?? [];
     if (!reference) continue;
-    const [, day, month, year] = /published (\d{2})\/(\d{2})\/(\d{4})/.exec(link.parentNode!.text) ?? [];
+    const cell = link.parentNode!.text;
+    const [, subtitle, day, month, year] = /^\s*([\s\S]*?)\s*\[published (\d{2})\/(\d{2})\/(\d{4})/.exec(cell.slice(cell.indexOf(link.text) + link.text.length)) ?? [];
     postings.push({
       source: "RWTH",
       externalId: reference,
-      title,
+      title: subtitle ? `${title} – ${subtitle}` : title,
       company: "RWTH Aachen University",
       place: "Aachen",
       remote: null,

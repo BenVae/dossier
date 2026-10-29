@@ -174,7 +174,7 @@ const rwthRow = (link: string, published: string, unit: string) => `<tr>
 </h3>${unit}</td>
 </tr>`;
 
-/** The RWTH job portal's English listings, as they read on 25 October 2026, cut to three rows. */
+/** The RWTH job portal's English listings, as they read on 25 October 2026, cut to four rows. */
 export const rwthPage = `<!DOCTYPE html><html lang="en"><body><main>
 <div class="result-wrapper">
 <h2 class="h3 result-count skip-to-module" id="search-results">Showing 1 - 50 of 184 Results</h2>
@@ -183,6 +183,7 @@ export const rwthPage = `<!DOCTYPE html><html lang="en"><body><main>
 ${rwthRow('<a href="/go/id/kbag/file/V000011619/lidx/1/" target="_self" class="iconless">Research Assistant (f/m/d) - Experimental Hybrid Additive Manufacturing and Microstructure Characterization [V000011619]</a>', "19/10/2026", "Chair for Digital Additive Production [421510]")}
 ${rwthRow('<a href="/go/id/kbag/file/V000011488/" target="_self" class="iconless">Sachgebietsleiter*in für das Sachgebiet 10.34 Abwasser-, Wasser- und Gasanlagen (w/m/d) (in German only) [V000011488]</a>', "19/10/2026", "Division 10.3 - Technical Facilities Management - Mechanical Systems [011030]")}
 ${rwthRow('<a href="/go/id/kbag/file/V000011524/" target="_self" class="iconless">Softwareentwickler*in (w/m/d) für die landesweite KI-Plattform der NRW-Hochschulen &#8211; Projekt KI:Expertisezentrum.nrw (in German only) [V000011524]</a>', "05/10/2026", "IT Center [022000]")}
+${rwthRow('<a href="/go/id/kbag/file/V000011580/lidx/1/" target="_self" class="iconless">Research Assistant/Associate (f/m/d) [V000011580]</a><br/>Physical AI &amp; Robot Learning', "05/10/2026", "Chair of Imaging and Computer Vision [611710]")}
 </tbody>
 </table>
 </div></main></body></html>`;
