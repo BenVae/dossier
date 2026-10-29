@@ -68,4 +68,12 @@ describe("RWTH search", () => {
       message: "The RWTH job portal has changed or isn't answering. Try another source in Settings → Job search.",
     });
   });
+
+  it("words a refused search without a key, the portal having none", async () => {
+    stubFetch(() => new Response("", { status: 403 }));
+    await expect(rwth.search(query, {}, null)).rejects.toMatchObject({
+      problem: "key",
+      message: "RWTH Aachen University refused the search. Try again later, or another source in Settings → Job search.",
+    });
+  });
 });

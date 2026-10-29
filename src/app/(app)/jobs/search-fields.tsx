@@ -90,14 +90,20 @@ export function SearchFields({
   );
 }
 
-/** "Remote only", with what it means on Adzuna, which has no such filter. */
+/** "Remote only", with what it means on Adzuna, which has no such filter, and on RWTH, which ignores where. */
 export function RemoteOnlyField({ value, onChange, source }: { value: SearchQuery; onChange: (patch: Partial<SearchQuery>) => void; source: JobSource | null }) {
   return (
     <Checkbox
       label="Remote only"
       checked={value.remoteOnly}
       onChange={(event) => onChange({ remoteOnly: event.target.checked })}
-      hint={source === "ADZUNA" && value.remoteOnly ? "Adzuna has no remote filter, so this adds “remote” to your search." : undefined}
+      hint={
+        source === "RWTH"
+          ? "RWTH Aachen University only lists its own jobs in Aachen, so it ignores place, radius and Remote only."
+          : source === "ADZUNA" && value.remoteOnly
+            ? "Adzuna has no remote filter, so this adds “remote” to your search."
+            : undefined
+      }
     />
   );
 }
